@@ -1,0 +1,10 @@
+flask==3.0.0
+flask-cors==4.0.0
+flask-socketio==5.3.5
+mysql-connector-python==8.2.0
+opencv-python==4.8.1.78
+ultralytics==8.1.0
+python-dotenv==1.0.0
+pillow==10.1.0
+numpy==1.24.3
+eventlet==0.33.3

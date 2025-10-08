@@ -1,0 +1,1495 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistema de Detección de Accidentes</title>
+  
+  <!-- Chart.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+  
+  <!-- Socket.IO -->
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  
+  <style>
+    /* --- Estilos Generales --- */
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#2D2D30;color:#E0E0E0;height:100vh;overflow:hidden;}
+    .container{display:flex;height:100vh;flex-direction:column;}
+    .header{height:80px;background:linear-gradient(to right,#1E1E1E,#2D2D30);border-bottom:2px solid #444;display:flex;align-items:center;padding:0 20px;color:#E0E0E0;}
+    .logo{width:60px;height:60px;background:#E53935;border:2px solid #C62828;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-right:20px;font-size:24px;font-weight:bold;}
+    .header-content{flex:1;}
+    .header-title{font-size:22px;font-weight:600;margin-bottom:5px;}
+    .header-subtitle{font-size:14px;color:#999;}
+    .system-status{background:rgba(255,255,255,0.05);border:1px solid #444;border-radius:8px;padding:15px;min-width:250px;}
+    .status-item{display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px;}
+    .status-indicator{width:10px;height:10px;border-radius:50%;background:#4CAF50;animation:pulse 2s infinite;}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+    .main-content{display:flex;flex:1;overflow:hidden;}
+    .sidebar{width:220px;background:linear-gradient(to bottom,#252526,#1E1E1E);border-right:2px solid #444;overflow-y:auto;padding:20px 0 120px 0;}
+    .menu-button{width:190px;height:45px;margin:5px 15px;border:none;border-radius:8px;color:#E0E0E0;font-family:inherit;cursor:pointer;transition:all 0.3s;font-size:14px;display:flex;align-items:center;gap:10px;padding-left:15px;}
+    .menu-button.active{background:#007ACC;border:1px solid #005A9E;}
+    .menu-button:not(.active){background:rgba(255,255,255,0.05);border:1px solid #444;}
+    .menu-button:hover{background:rgba(255,255,255,0.1);}
+    .user-info{position:fixed;bottom:20px;left:15px;width:190px;background:rgba(255,255,255,0.03);border:1px solid #444;border-radius:6px;padding:15px;text-align:center;z-index:100;}
+    .content{flex:1;padding:20px;overflow-y:auto;background:#2D2D30;}
+    .page{display:none;}
+    .page.active{display:block;}
+    .card{background:#252526;border:1px solid #444;border-radius:8px;padding:25px;margin-bottom:20px;}
+    .card-title{font-size:20px;font-weight:600;margin-bottom:20px;color:#E0E0E0;border-bottom:1px solid #444;padding-bottom:10px;}
+    .form-container{background:#252526;border-radius:8px;padding:25px;margin-bottom:20px;border:1px solid #444;}
+    .form-row{display:flex;gap:20px;margin-bottom:20px;flex-wrap:wrap;}
+    .form-group{flex:1;min-width:200px;}
+    .form-label{display:block;margin-bottom:8px;color:#E0E0E0;font-size:14px;font-weight:500;}
+    .form-input{width:100%;padding:10px;background:#3E3E42;border:1px solid #444;color:#E0E0E0;border-radius:6px;font-size:14px;}
+    .btn{padding:10px 20px;border:none;border-radius:6px;font-weight:600;cursor:pointer;font-size:14px;transition:all 0.3s;margin-right:10px;}
+    .btn-primary{background:#007ACC;color:white;}
+    .btn-primary:hover{background:#005A9E;}
+    .btn-danger{background:#E53935;color:white;}
+    .btn-danger:hover{background:#C62828;}
+    .btn-success{background:#4CAF50;color:white;}
+    .btn-success:hover{background:#388E3C;}
+    .btn-warning{background:#FF9800;color:white;}
+    .btn-warning:hover{background:#F57C00;}
+    .camera-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px;margin-top:20px;}
+    .camera-card{background:#222224;border:1px solid #444;border-radius:8px;padding:15px;text-align:center;position:relative;}
+    .camera-preview{width:100%;height:150px;background:#1E1E1E;border-radius:6px;margin-bottom:10px;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+    .camera-preview img{width:100%;height:100%;object-fit:cover;}
+    .data-table{width:100%;border-collapse:collapse;margin-top:15px;}
+    .data-table th,.data-table td{padding:12px;text-align:left;border-bottom:1px solid #444;}
+    .data-table th{background:#1E1E1E;}
+    .map-frame{width:100%;height:400px;border:0;border-radius:8px;margin-top:15px;}
+    canvas{background:#1E1E1E;border:1px solid #444;border-radius:8px;padding:10px;}
+    
+    /* DVR Grid */
+    .dvr-controls{display:flex;gap:10px;margin-bottom:15px;flex-wrap:wrap;}
+    .dvr-grid{display:grid;gap:10px;background:#1E1E1E;padding:10px;border-radius:8px;}
+    .dvr-grid.grid-1{grid-template-columns:1fr;}
+    .dvr-grid.grid-2{grid-template-columns:1fr 1fr;}
+    .dvr-grid.grid-4{grid-template-columns:1fr 1fr;}
+    .dvr-grid.grid-6{grid-template-columns:1fr 1fr 1fr;}
+    .dvr-cell{background:#252526;border:2px solid #444;border-radius:6px;aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;position:relative;cursor:pointer;transition:border 0.3s;overflow:hidden;}
+    .dvr-cell:hover{border-color:#007ACC;}
+    .dvr-cell img{width:100%;height:100%;object-fit:cover;}
+    .dvr-cell.fullscreen{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:1000;border-radius:0;}
+    .dvr-label{position:absolute;top:10px;left:10px;background:rgba(0,0,0,0.7);padding:5px 10px;border-radius:4px;font-size:12px;z-index:10;}
+    
+    /* Detection Panel */
+    .detection-panel{background:#1E1E1E;border:1px solid #444;border-radius:8px;padding:15px;margin-bottom:15px;max-height:200px;overflow-y:auto;}
+    .detection-item{background:#252526;padding:10px;margin-bottom:8px;border-radius:6px;border-left:4px solid #E53935;display:flex;justify-content:space-between;align-items:center;}
+    
+    /* Modal */
+    .modal{display:none;position:fixed;z-index:1000;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,0.7);}
+    .modal.show{display:flex;align-items:center;justify-content:center;}
+    .modal-content{background:#252526;border:1px solid #444;border-radius:8px;padding:30px;min-width:400px;max-width:90%;max-height:90%;overflow-y:auto;}
+    .modal-header{font-size:20px;font-weight:600;margin-bottom:20px;border-bottom:1px solid #444;padding-bottom:10px;}
+    .modal-close{float:right;font-size:28px;cursor:pointer;color:#999;}
+    .modal-close:hover{color:#E53935;}
+    
+    /* Toast Notifications */
+    .toast-container{position:fixed;top:100px;right:20px;z-index:2000;max-width:350px;}
+    .toast{background:#252526;border:1px solid #444;border-radius:8px;padding:15px;margin-bottom:10px;box-shadow:0 4px 12px rgba(0,0,0,0.5);animation:slideIn 0.3s;}
+    .toast.success{border-left:4px solid #4CAF50;}
+    .toast.error{border-left:4px solid #E53935;}
+    .toast.warning{border-left:4px solid #FF9800;}
+    .toast.info{border-left:4px solid #007ACC;}
+    @keyframes slideIn{from{transform:translateX(400px);opacity:0;}to{transform:translateX(0);opacity:1;}}
+    
+    /* Video Upload */
+    .video-preview-container{background:#1E1E1E;padding:20px;border-radius:8px;margin:15px 0;text-align:center;}
+    .detections-list{background:#1E1E1E;padding:15px;border-radius:8px;margin:15px 0;}
+    .detection-result{background:#252526;padding:12px;margin-bottom:8px;border-radius:6px;border-left:3px solid #FF9800;}
+    
+    /* Map Controls */
+    .map-controls{display:flex;gap:10px;margin-bottom:15px;}
+    .map-container{position:relative;}
+    .heatmap-overlay{position:absolute;top:15px;right:15px;background:rgba(0,0,0,0.8);padding:10px;border-radius:6px;font-size:12px;}
+    
+    /* Leaflet Map */
+    #mapContainer{height:400px;border:1px solid #444;border-radius:8px;margin-top:10px;z-index:1;}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="logo">🚨</div>
+      <div class="header-content">
+        <div class="header-title">Sistema de Detección de Accidentes</div>
+        <div class="header-subtitle">Monitoreo Inteligente en Tiempo Real</div>
+      </div>
+      <div class="system-status">
+        <div class="status-item"><span>Sistema Activo</span><span class="status-indicator"></span></div>
+        <div class="status-item"><span>Cámaras Online</span><span style="color:#4CAF50;" id="cameras-online">0/0</span></div>
+        <div class="status-item"><span>Última Detección</span><span style="color:#FF9800;" id="last-detection">--:--:--</span></div>
+        <div class="status-item"><span id="current-time">00:00:00</span></div>
+      </div>
+    </div>
+
+    <!-- Main -->
+    <div class="main-content">
+      <div class="sidebar">
+        <button class="menu-button active" onclick="showPage('dashboard')">📊 Dashboard</button>
+        <button class="menu-button" onclick="showPage('camaras')">📹 Cámaras</button>
+        <button class="menu-button" onclick="showPage('agregar')">➕ Agregar Cámara</button>
+        <button class="menu-button" onclick="showPage('monitoreo')">🔴 Monitoreo DVR</button>
+        <button class="menu-button" onclick="showPage('registros')">📋 Registros</button>
+        <button class="menu-button" onclick="showPage('subir')">📤 Subir Video</button>
+        <button class="menu-button" onclick="showPage('estadisticas')">📈 Estadísticas</button>
+        <button class="menu-button" onclick="showPage('mapa')">🗺️ Mapa</button>
+        <button class="menu-button" onclick="showPage('config')">⚙️ Configuración</button>
+        <button class="menu-button" onclick="showPage('usuarios')">👥 Usuarios</button>
+        <button class="menu-button" onclick="showPage('reportes')">📄 Reportes</button>
+        <button class="menu-button" onclick="logout()">🚪 Salir</button>
+        <div class="user-info"><div><b>👤 Administrador</b></div><div style="font-size:12px;color:#999;">Sesión activa</div></div>
+      </div>
+
+      <!-- Content -->
+      <div class="content">
+        <!-- Dashboard -->
+        <div id="dashboard" class="page active">
+          <div class="card">
+            <div class="card-title">Resumen General</div>
+            <div class="form-row">
+              <div class="form-group">
+                <div style="text-align:center;padding:20px;background:#1E1E1E;border-radius:8px;">
+                  <div style="font-size:36px;color:#4CAF50;font-weight:bold;" id="dash-cams">0</div>
+                  <div style="color:#999;">Cámaras Activas</div>
+                </div>
+              </div>
+              <div class="form-group">
+                <div style="text-align:center;padding:20px;background:#1E1E1E;border-radius:8px;">
+                  <div style="font-size:36px;color:#E53935;font-weight:bold;" id="dash-accidents">0</div>
+                  <div style="color:#999;">Accidentes Registrados</div>
+                </div>
+              </div>
+              <div class="form-group">
+                <div style="text-align:center;padding:20px;background:#1E1E1E;border-radius:8px;">
+                  <div style="font-size:36px;color:#FF9800;font-weight:bold;" id="dash-users">0</div>
+                  <div style="color:#999;">Usuarios Activos</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Cámaras -->
+        <div id="camaras" class="page">
+          <div class="card">
+            <div class="card-title">Cámaras Registradas</div>
+            <div id="cameraList" class="camera-grid"></div>
+          </div>
+        </div>
+
+        <!-- Agregar Cámara -->
+        <div id="agregar" class="page">
+          <div class="form-container">
+            <div class="card-title">Agregar Nueva Cámara</div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Dirección IP *</label>
+                <input id="camIP" class="form-input" placeholder="192.168.1.100" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Puerto</label>
+                <input id="camPort" class="form-input" placeholder="554" value="554">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Usuario</label>
+                <input id="camUser" class="form-input" placeholder="admin" value="admin">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Contraseña</label>
+                <input type="password" id="camPass" class="form-input" placeholder="password">
+              </div>
+            </div>
+            
+            <!-- MAPA INTERACTIVO -->
+            <div class="form-group" style="min-width:100%;">
+              <label class="form-label">📍 Seleccione la ubicación en el mapa (haga clic para marcar) *</label>
+              <div id="mapContainer"></div>
+              <button class="btn btn-primary" onclick="useMyLocation()" style="margin-top:10px;">📍 Usar mi ubicación</button>
+            </div>
+            
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Latitud *</label>
+                <input id="camLat" class="form-input" placeholder="4.6097" readonly required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Longitud *</label>
+                <input id="camLng" class="form-input" placeholder="-74.0817" readonly required>
+              </div>
+            </div>
+            
+            <button class="btn btn-primary" onclick="addCamera()">💾 Guardar Cámara</button>
+          </div>
+        </div>
+
+        <!-- Monitoreo DVR -->
+        <div id="monitoreo" class="page">
+          <div class="card">
+            <div class="card-title">Monitoreo en Vivo - Vista DVR</div>
+            
+            <!-- Detection Panel -->
+            <div class="detection-panel">
+              <div style="font-weight:bold;margin-bottom:10px;">🔴 Detecciones en Tiempo Real</div>
+              <div id="detection-feed">
+                <div style="color:#999;text-align:center;padding:20px;">Esperando detecciones...</div>
+              </div>
+            </div>
+            
+            <!-- DVR Controls -->
+            <div class="dvr-controls">
+              <button class="btn btn-primary" onclick="setDVRGrid(1)">1 Cámara</button>
+              <button class="btn btn-primary" onclick="setDVRGrid(2)">2 Cámaras</button>
+              <button class="btn btn-primary" onclick="setDVRGrid(4)">4 Cámaras</button>
+              <button class="btn btn-primary" onclick="setDVRGrid(6)">6 Cámaras</button>
+            </div>
+            
+            <!-- DVR Grid -->
+            <div id="dvrGrid" class="dvr-grid grid-4"></div>
+          </div>
+        </div>
+
+        <!-- Registros -->
+        <div id="registros" class="page">
+          <div class="card">
+            <div class="card-title">Registros de Accidentes</div>
+            <button class="btn btn-success" onclick="exportToCSV()">📥 Exportar a CSV</button>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Fecha</th>
+                  <th>Hora</th>
+                  <th>Archivo</th>
+                  <th>Cámara</th>
+                  <th>Ubicación</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="registrosTable"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Subir Video -->
+        <div id="subir" class="page">
+          <div class="card">
+            <div class="card-title">Subir Video para Análisis</div>
+            <div class="form-group">
+              <label class="form-label">Seleccionar Video</label>
+              <input type="file" accept="video/*" class="form-input" onchange="previewVideo(event)" id="videoInput">
+            </div>
+            <div class="video-preview-container">
+              <video id="videoPreview" controls width="600" style="max-width:100%;display:none;"></video>
+            </div>
+            <button class="btn btn-warning" onclick="analyzeVideo()" id="analyzeBtn" disabled>🔍 Analizar Video</button>
+            
+            <div id="analysisResults" style="display:none;">
+              <div class="card-title" style="margin-top:20px;">Resultados del Análisis</div>
+              <div class="detections-list" id="detectionsList"></div>
+              <button class="btn btn-success" onclick="downloadResults()">📥 Descargar Resultados</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Estadísticas -->
+        <div id="estadisticas" class="page">
+          <div class="card">
+            <div class="card-title">Accidentes por Hora del Día</div>
+            <canvas id="hourChart" height="80"></canvas>
+          </div>
+          <div class="card">
+            <div class="card-title">Accidentes por Zona</div>
+            <canvas id="zoneChart" height="80"></canvas>
+          </div>
+          <div class="card">
+            <div class="card-title">Accidentes por Cámara</div>
+            <canvas id="cameraChart" height="80"></canvas>
+          </div>
+        </div>
+
+        <!-- Mapa -->
+        <div id="mapa" class="page">
+          <div class="card">
+            <div class="card-title">Mapa de Cámaras y Accidentes</div>
+            <div class="map-controls">
+              <button class="btn btn-primary" onclick="toggleHeatmap()">🔥 Activar Mapa de Calor</button>
+              <button class="btn btn-primary" onclick="showAllCameras()">📹 Mostrar Cámaras</button>
+            </div>
+            <div class="map-container">
+              <div id="mapContainerMapa" style="height: 500px; border-radius: 12px; overflow: hidden;"></div>
+              <div class="heatmap-overlay" id="heatmapInfo" style="display:none;">
+                🔥 Mapa de Calor Activo<br>
+                🔴 Alta concentración<br>
+                🟡 Media concentración<br>
+                🟢 Baja concentración
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Configuración -->
+        <div id="config" class="page">
+          <div class="form-container">
+            <div class="card-title">Configuración General del Sistema</div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Ruta de Almacenamiento</label>
+                <input type="text" class="form-input" id="configPath" value="/var/videos/accidents">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Formato de Video</label>
+                <select class="form-input" id="configFormat">
+                  <option value="mp4">MP4</option>
+                  <option value="avi">AVI</option>
+                  <option value="mkv">MKV</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Tiempo de Grabación Post-Detección (segundos)</label>
+                <input type="number" class="form-input" id="configRecTime" value="30">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Sensibilidad de Detección (0-100)</label>
+                <input type="number" class="form-input" id="configSensitivity" value="75" min="0" max="100">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Segundos Previos a Guardar</label>
+                <input type="number" class="form-input" id="configPreSeconds" value="5">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Notificaciones</label>
+                <select class="form-input" id="configNotifications">
+                  <option value="all">Todas</option>
+                  <option value="critical">Solo Críticas</option>
+                  <option value="none">Ninguna</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Tiempo de Refresco (segundos)</label>
+                <input type="number" class="form-input" id="configRefresh" value="30">
+              </div>
+            </div>
+            <button class="btn btn-primary" onclick="saveConfig()">💾 Guardar Configuración</button>
+          </div>
+        </div>
+
+        <!-- Usuarios -->
+        <div id="usuarios" class="page">
+          <div class="card">
+            <div class="card-title">Gestión de Usuarios</div>
+            <button class="btn btn-primary" onclick="openUserModal()">➕ Agregar Usuario</button>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Nombre</th>
+                  <th>Correo</th>
+                  <th>Rol</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="usersTable"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Reportes -->
+        <div id="reportes" class="page">
+          <div class="card">
+            <div class="card-title">Reportes Generados</div>
+            <button class="btn btn-primary" onclick="generateReport()">📄 Generar Nuevo Reporte</button>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Reporte</th>
+                  <th>Fecha</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="reportsTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Usuario -->
+  <div id="userModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <span class="modal-close" onclick="closeUserModal()">&times;</span>
+        <span id="modalTitle">Agregar Usuario</span>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nombre Completo</label>
+        <input type="text" class="form-input" id="userName" placeholder="Juan Pérez">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Correo Electrónico</label>
+        <input type="email" class="form-input" id="userEmail" placeholder="juan@ejemplo.com">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Rol</label>
+        <select class="form-input" id="userRole">
+          <option value="administrador">Administrador</option>
+          <option value="operador">Operador</option>
+          <option value="analista">Analista</option>
+          <option value="emergencias">Emergencias</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="saveUser()">💾 Guardar</button>
+      <button class="btn" style="background:#666;" onclick="closeUserModal()">Cancelar</button>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+<script>
+  // ============================================
+  // CONFIGURACIÓN
+  // ============================================
+  const API_URL = 'http://localhost:5000/api';
+  const socket = io('http://localhost:5000');
+
+  // Estado global
+  let cameras = [];
+  let accidents = [];
+  let users = [];
+  let currentGrid = 4;
+  let map = null;
+  let marker = null;
+
+  // ============================================
+  // CONEXIÓN WEBSOCKET
+  // ============================================
+  socket.on('connect', () => {
+    console.log('✓ Conectado al backend');
+    showToast('Conectado al servidor', 'success');
+    loadAllData();
+  });
+
+  socket.on('disconnect', () => {
+    console.log('✗ Desconectado del backend');
+    showToast('Desconectado del servidor', 'warning');
+  });
+
+  // Escuchar detecciones SEVERE en tiempo real
+  socket.on('severe_detected', (data) => {
+    console.log('🚨 ACCIDENTE SEVERE:', data);
+    showToast(`ACCIDENTE SEVERE - Cámara ${data.camera_ip} (${data.confidence}%)`, 'error');
+    addDetectionToFeed(data);
+    document.getElementById('last-detection').innerText = new Date().toLocaleTimeString();
+    loadAccidents
+    ();
+  });
+
+  // Escuchar frames de cámaras en tiempo real
+  socket.on('camera_frame', (data) => {
+    updateCameraFrame(data.camera_id, data.frame, data.is_recording);
+  });
+
+  socket.on('recording_finished', (data) => {
+    showToast(`Grabación finalizada - Cámara ${data.camera_id}`, 'info');
+    loadAccidents();
+  });
+
+  // ============================================
+  // FUNCIONES DE CARGA DE DATOS REALES
+  // ============================================
+
+  async function loadAllData() {
+    await loadCameras();
+    await loadAccidents();
+    await loadUsers();
+    updateDashboard();
+  }
+
+  async function loadCameras() {
+    try {
+      const response = await fetch(`${API_URL}/cameras`);
+      const data = await response.json();
+      
+      if (data.success) {
+        cameras = data.cameras;
+        updateCameraCount();
+        renderCameras();
+      }
+    } catch (error) {
+      console.error('Error cargando cámaras:', error);
+      showToast('Error cargando cámaras', 'error');
+    }
+  }
+
+  async function loadAccidents() {
+    try {
+      const response = await fetch(`${API_URL}/accidents?limit=100`);
+      const data = await response.json();
+      
+      if (data.success) {
+        accidents = data.accidents;
+        renderRegistros();
+        updateDashboard();
+      }
+    } catch (error) {
+      console.error('Error cargando accidentes:', error);
+      showToast('Error cargando accidentes', 'error');
+    }
+  }
+
+  async function loadUsers() {
+    try {
+      const response = await fetch(`${API_URL}/users`);
+      const data = await response.json();
+      
+      if (data.success) {
+        users = data.users;
+        renderUsers();
+      }
+    } catch (error) {
+      console.error('Error cargando usuarios:', error);
+    }
+  }
+
+  // ============================================
+  // NAVEGACIÓN
+  // ============================================
+  function showPage(pageId) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.menu-button').forEach(b => b.classList.remove('active'));
+    document.getElementById(pageId).classList.add('active');
+    event.target.classList.add('active');
+    
+    if (pageId === 'camaras') loadCameras();
+    if (pageId === 'agregar') {
+      setTimeout(() => {
+        initMap();
+        if (map) map.invalidateSize();
+      }, 100);
+    }
+    if (pageId === 'monitoreo') initDVR();
+    if (pageId === 'registros') loadAccidents();
+    if (pageId === 'estadisticas') initCharts();
+    if (pageId === 'dashboard') updateDashboard();
+    if (pageId === 'usuarios') loadUsers();
+    if (pageId === 'mapa') { initMainMap();
+}
+
+  }
+
+  function logout() {
+    if (confirm('¿Desea cerrar sesión?')) {
+      showToast('Sesión cerrada', 'success');
+      setTimeout(() => location.reload(), 1000);
+    }
+  }
+let mainMap = null;
+let mainMarker = null;
+
+function initMainMap() {
+  if (mainMap !== null) return;
+
+  const defaultLat = 4.6097;
+  const defaultLng = -74.0817;
+
+  mainMap = L.map('mapContainerMapa').setView([defaultLat, defaultLng], 13);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors',
+    maxZoom: 19
+  }).addTo(mainMap);
+
+  mainMap.on('click', function(e) {
+    const lat = e.latlng.lat;
+    const lng = e.latlng.lng;
+
+    if (mainMarker !== null) {
+      mainMap.removeLayer(mainMarker);
+    }
+
+    mainMarker = L.marker([lat, lng]).addTo(mainMap);
+    showToast(`Punto seleccionado: ${lat.toFixed(6)}, ${lng.toFixed(6)}`, 'info');
+  });
+}
+
+function showAllCameras() {
+  if (mainMap === null) {
+    initMainMap();
+    setTimeout(showAllCameras, 500);
+    return;
+  }
+  
+  // Limpiar marcadores anteriores
+  mainMap.eachLayer(layer => {
+    if (layer instanceof L.Marker) {
+      mainMap.removeLayer(layer);
+    }
+  });
+  
+  if (cameras.length === 0) {
+    showToast('No hay cámaras registradas', 'warning');
+    return;
+  }
+  
+  // Agregar marcador por cada cámara
+  cameras.forEach(cam => {
+    if (cam.latitud && cam.longitud) {
+      const marker = L.marker([cam.latitud, cam.longitud]).addTo(mainMap);
+      marker.bindPopup(`
+        <div style="color:#000;">
+          <strong>Cámara ${cam.id}</strong><br>
+          IP: ${cam.ip}:${cam.puerto}<br>
+          Estado: ${cam.is_streaming ? '🟢 Activa' : '⚫ Inactiva'}
+        </div>
+      `);
+    }
+  });
+  
+  // Centrar mapa en la primera cámara
+  if (cameras[0] && cameras[0].latitud && cameras[0].longitud) {
+    mainMap.setView([cameras[0].latitud, cameras[0].longitud], 13);
+  }
+  
+  showToast(`${cameras.length} cámaras mostradas en el mapa`, 'success');
+}
+  // ============================================
+  // MAPA LEAFLET
+  // ============================================
+  function initMap() {
+    if (map !== null) return;
+    
+    const defaultLat = 4.6097;
+    const defaultLng = -74.0817;
+    
+    map = L.map('mapContainer').setView([defaultLat, defaultLng], 13);
+    
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap',
+      maxZoom: 19
+    }).addTo(map);
+    
+    map.on('click', function(e) {
+      const lat = e.latlng.lat;
+      const lng = e.latlng.lng;
+      
+      document.getElementById('camLat').value = lat.toFixed(6);
+      document.getElementById('camLng').value = lng.toFixed(6);
+      
+      if (marker !== null) {
+        map.removeLayer(marker);
+      }
+      
+      marker = L.marker([lat, lng]).addTo(map);
+      showToast(`Ubicación seleccionada: ${lat.toFixed(6)}, ${lng.toFixed(6)}`, 'success');
+    });
+  }
+
+  function useMyLocation() {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(function(position) {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        
+        map.setView([lat, lng], 15);
+        
+        if (marker) map.removeLayer(marker);
+        marker = L.marker([lat, lng]).addTo(map);
+        
+        document.getElementById('camLat').value = lat.toFixed(6);
+        document.getElementById('camLng').value = lng.toFixed(6);
+        
+        showToast('Ubicación actual obtenida', 'success');
+      }, function() {
+        showToast('No se pudo obtener la ubicación', 'error');
+      });
+    }
+  }
+
+  // ============================================
+  // CÁMARAS
+  // ============================================
+
+  async function addCamera() {
+    const ip = document.getElementById('camIP').value;
+    const puerto = document.getElementById('camPort').value || '554';
+    const usuario = document.getElementById('camUser').value || 'admin';
+    const password = document.getElementById('camPass').value || '';
+    const latitud = parseFloat(document.getElementById('camLat').value);
+    const longitud = parseFloat(document.getElementById('camLng').value);
+    
+    if (!ip || !latitud || !longitud) {
+      showToast('Complete IP, Latitud y Longitud (seleccione en el mapa)', 'error');
+      return;
+    }
+    
+    const data = {
+      ip: ip,
+      puerto: puerto,
+      usuario: usuario,
+      password: password,
+      latitud: latitud,
+      longitud: longitud,
+      url_rtsp: `rtsp://${usuario}:${password}@${ip}:${puerto}/Streaming/Channels/101`
+    };
+    
+    try {
+      const response = await fetch(`${API_URL}/cameras`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        showToast('Cámara agregada correctamente', 'success');
+        
+        document.getElementById('camIP').value = '';
+        document.getElementById('camPort').value = '554';
+        document.getElementById('camUser').value = 'admin';
+        document.getElementById('camPass').value = '';
+        document.getElementById('camLat').value = '';
+        document.getElementById('camLng').value = '';
+        
+        if (marker) {
+          map.removeLayer(marker);
+          marker = null;
+        }
+        
+        loadCameras();
+        showPage('camaras');
+      } else {
+        showToast('Error: ' + result.error, 'error');
+      }
+    } catch (error) {
+      showToast('Error conectando con el servidor', 'error');
+    }
+  }
+
+  async function deleteCamera(id) {
+    if (!confirm('¿Eliminar esta cámara?')) return;
+    
+    try {
+      const response = await fetch(`${API_URL}/cameras/${id}`, {
+        method: 'DELETE'
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        showToast('Cámara eliminada', 'success');
+        loadCameras();
+      }
+    } catch (error) {
+      showToast('Error eliminando cámara', 'error');
+    }
+  }
+
+  function renderCameras() {
+    const list = document.getElementById("cameraList");
+    list.innerHTML = "";
+    
+    if (cameras.length === 0) {
+      list.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#999;padding:40px;">No hay cámaras registradas. Agrega una desde el menú.</div>';
+      return;
+    }
+    
+    cameras.forEach(cam => {
+      const card = document.createElement("div");
+      card.className = "camera-card";
+      
+      let previewContent = `<div style="font-size:48px;">📹</div>`;
+      
+      if (cam.is_streaming) {
+        previewContent = `<img id="cam-preview-${cam.id}" style="width:100%;height:100%;object-fit:cover;" alt="Stream en vivo">`;
+      }
+      
+      card.innerHTML = `
+        <div class="camera-preview">${previewContent}</div>
+        <div style="margin-bottom:8px;"><b>Cámara ${cam.id}</b></div>
+        <div style="font-size:12px;color:#999;margin-bottom:4px;">IP: ${cam.ip}:${cam.puerto}</div>
+        <div style="font-size:12px;color:#999;margin-bottom:4px;">📍 ${cam.latitud != null ? parseFloat(cam.latitud).toFixed(6) : 'N/A'}, ${cam.longitud != null ? parseFloat(cam.longitud).toFixed(6) : 'N/A'}</div>
+        <div style="font-size:12px;margin-bottom:10px;">
+          <span style="color:${cam.is_streaming ? '#4CAF50' : '#999'};">● ${cam.is_streaming ? 'Transmitiendo' : 'Detenida'}</span>
+        </div>
+        <button class="btn ${cam.is_streaming ? 'btn-danger' : 'btn-success'}" 
+                onclick="${cam.is_streaming ? 'stopCameraStream' : 'startCameraStream'}(${cam.id})" 
+                style="font-size:12px;padding:6px 12px;margin-right:5px;">
+          ${cam.is_streaming ? '⏹️ Detener' : '▶️ Iniciar'}
+        </button>
+        <button class="btn btn-danger" onclick="deleteCamera(${cam.id})" style="font-size:12px;padding:6px 12px;">🗑️ Eliminar</button>
+      `;
+      list.appendChild(card);
+    });
+    
+    updateCameraCount();
+  }
+
+  function updateCameraCount() {
+    const total = cameras.length;
+    const active = cameras.filter(c => c.is_streaming).length;
+    
+    document.getElementById("cameras-online").innerText = `${active}/${total}`;
+    document.getElementById("dash-cams").innerText = total;
+  }
+
+  // ============================================
+  // MONITOREO DVR
+  // ============================================
+
+  function initDVR() {
+    renderDVRGrid();
+  }
+
+  function setDVRGrid(num) {
+    currentGrid = num;
+    renderDVRGrid();
+  }
+
+  function renderDVRGrid() {
+    const grid = document.getElementById('dvrGrid');
+    grid.className = `dvr-grid grid-${currentGrid}`;
+    grid.innerHTML = '';
+    
+    for (let i = 0; i < currentGrid; i++) {
+      const cell = document.createElement('div');
+      cell.className = 'dvr-cell';
+      cell.dataset.cameraId = cameras[i]?.id || '';
+      
+      if (i < cameras.length) {
+        const cam = cameras[i];
+        cell.innerHTML = `
+          <div class="dvr-label">Cámara ${cam.id} - ${cam.ip}</div>
+          <div style="color:#999;padding:20px;">Esperando stream...</div>
+          <div style="position:absolute;bottom:10px;left:10px;z-index:10;">
+            <button class="btn btn-success" onclick="startCameraStream(${cam.id})" style="font-size:10px;padding:4px 8px;">▶️ Iniciar</button>
+            <button class="btn btn-danger" onclick="stopCameraStream(${cam.id})" style="font-size:10px;padding:4px 8px;">⏹️ Detener</button>
+          </div>
+        `;
+      } else {
+        cell.innerHTML = '<div style="color:#666;">Sin cámara asignada</div>';
+      }
+      
+      grid.appendChild(cell);
+    }
+  }
+
+  async function startCameraStream(cameraId) {
+    try {
+      const response = await fetch(`${API_URL}/cameras/${cameraId}/start`, {
+        method: 'POST'
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        showToast('Stream iniciado', 'success');
+        loadCameras();
+      } else {
+        showToast('Error iniciando stream', 'error');
+      }
+    } catch (error) {
+      showToast('Error conectando con el servidor', 'error');
+    }
+  }
+
+  async function stopCameraStream(cameraId) {
+    try {
+      const response = await fetch(`${API_URL}/cameras/${cameraId}/stop`, {
+        method: 'POST'
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        showToast('Stream detenido', 'success');
+        loadCameras();
+      }
+    } catch (error) {
+      showToast('Error deteniendo stream', 'error');
+    }
+  }
+
+  function updateCameraFrame(cameraId, frameBase64, isRecording) {
+    // Actualizar en vista de cámaras
+    const preview = document.getElementById(`cam-preview-${cameraId}`);
+    if (preview) {
+      preview.src = 'data:image/jpeg;base64,' + frameBase64;
+    }
+    
+    // Actualizar en DVR
+    const cells = document.querySelectorAll('.dvr-cell');
+    cells.forEach(cell => {
+      if (cell.dataset.cameraId == cameraId) {
+        let img = cell.querySelector('img');
+        if (!img) {
+          cell.innerHTML = '';
+          img = document.createElement('img');
+          img.style.width = '100%';
+          img.style.height = '100%';
+          img.style.objectFit = 'cover';
+          cell.appendChild(img);
+          
+          const label = document.createElement('div');
+          label.className = 'dvr-label';
+          label.innerText = `Cámara ${cameraId}`;
+          cell.appendChild(label);
+        }
+        
+        img.src = 'data:image/jpeg;base64,' + frameBase64;
+        
+        if (isRecording) {
+          cell.style.borderColor = '#E53935';
+          cell.style.borderWidth = '3px';
+        } else {
+          cell.style.borderColor = '#444';
+          cell.style.borderWidth = '2px';
+        }
+      }
+    });
+  }
+
+  function addDetectionToFeed(data) {
+    const feed = document.getElementById('detection-feed');
+    
+    // Limpiar mensaje de "Esperando"
+    if (feed.querySelector('[style*="text-align:center"]')) {
+      feed.innerHTML = '';
+    }
+    
+    const item = document.createElement('div');
+    item.className = 'detection-item';
+    item.innerHTML = `
+      <div>
+        <div style="font-weight:bold;">🚨 ACCIDENTE SEVERE</div>
+        <div style="font-size:11px;color:#999;">Cámara ${data.camera_ip} - ${new Date(data.timestamp).toLocaleTimeString()}</div>
+        <div style="font-size:11px;color:#4CAF50;">Confianza: ${data.confidence}%</div>
+      </div>
+      <div style="color:#E53935;">⚠️</div>
+    `;
+    
+    feed.insertBefore(item, feed.firstChild);
+    
+    if (feed.children.length > 10) {
+      feed.removeChild(feed.lastChild);
+    }
+  }
+
+  // ============================================
+  // REGISTROS
+  // ============================================
+
+  function renderRegistros() {
+    const table = document.getElementById('registrosTable');
+    table.innerHTML = '';
+    
+    if (accidents.length === 0) {
+      table.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#999;">No hay registros de accidentes</td></tr>';
+      return;
+    }
+    
+    accidents.forEach(acc => {
+      const fecha = new Date(acc.fecha_accidente);
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${acc.id}</td>
+        <td>${fecha.toLocaleDateString()}</td>
+        <td>${fecha.toLocaleTimeString()}</td>
+        <td>${acc.ruta_archivo || 'N/A'}</td>
+        <td>${acc.camera_ip || 'Cámara ' + acc.id_camara}</td>
+        <td>${acc.latitud}, ${acc.longitud}</td>
+        <td>
+          <button class="btn btn-primary" onclick="viewAccident(${acc.id})" style="font-size:11px;padding:4px 8px;">👁️ Ver</button>
+        </td>
+      `;
+      table.appendChild(tr);
+    });
+    
+    document.getElementById("dash-accidents").innerText = accidents.length;
+  }
+
+  function viewAccident(id) {
+    const acc = accidents.find(a => a.id === id);
+    if (!acc) return;
+    
+    const fecha = new Date(acc.fecha_accidente);
+    alert(`ACCIDENTE #${acc.id}\n\nFecha: ${fecha.toLocaleString()}\nCámara: ${acc.camera_ip || 'ID ' + acc.id_camara}\nUbicación: ${acc.latitud}, ${acc.longitud}\nDescripción: ${acc.descripcion || 'N/A'}\nArchivo: ${acc.ruta_archivo || 'N/A'}`);
+  }
+
+  async function exportToCSV() {
+    try {
+      const response = await fetch(`${API_URL}/accidents/export`);
+      
+      if (response.ok) {
+        const csv = await response.text();
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `accidentes_${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        
+        showToast('CSV exportado correctamente', 'success');
+      }
+    } catch (error) {
+      showToast('Error exportando CSV', 'error');
+    }
+  }
+
+  // ============================================
+  // SUBIR VIDEO
+  // ============================================
+
+  let currentVideo = null;
+  let analysisData = [];
+
+  function previewVideo(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    currentVideo = file;
+    const url = URL.createObjectURL(file);
+    const video = document.getElementById("videoPreview");
+    video.src = url;
+    video.style.display = 'block';
+    document.getElementById('analyzeBtn').disabled = false;
+    
+    showToast('Video cargado, listo para analizar', 'success');
+  }
+
+  async function analyzeVideo() {
+    if (!currentVideo) return;
+    
+    const formData = new FormData();
+    formData.append('video', currentVideo);
+    
+    showToast('Subiendo video...', 'info');
+    document.getElementById('analyzeBtn').disabled = true;
+    document.getElementById('analyzeBtn').innerText = '⏳ Subiendo...';
+    
+    try {
+      const uploadResponse = await fetch(`${API_URL}/videos/upload`, {
+        method: 'POST',
+        body: formData
+      });
+      
+      const uploadResult = await uploadResponse.json();
+      
+      if (!uploadResult.success) {
+        throw new Error(uploadResult.error);
+      }
+      
+      showToast('Analizando video con YOLO...', 'info');
+      document.getElementById('analyzeBtn').innerText = '⏳ Analizando...';
+      
+      const analyzeResponse = await fetch(`${API_URL}/videos/analyze`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          video_path: uploadResult.video_path,
+          filename: uploadResult.filename
+        })
+      });
+      
+      const analyzeResult = await analyzeResponse.json();
+      
+      if (analyzeResult.success) {
+        analysisData = analyzeResult.analysis.detections;
+        displayAnalysisResults();
+        
+        showToast(`Análisis completado: ${analysisData.length} detecciones SEVERE`, 'success');
+        
+        window.currentReportPath = analyzeResult.analysis.report_path;
+        window.currentAnnotatedVideoPath = analyzeResult.analysis.annotated_video_path;
+      } else {
+        throw new Error(analyzeResult.error);
+      }
+      
+    } catch (error) {
+      showToast('Error: ' + error.message, 'error');
+    } finally {
+      document.getElementById('analyzeBtn').disabled = false;
+      document.getElementById('analyzeBtn').innerText = '🔍 Analizar Video';
+    }
+  }
+
+function displayAnalysisResults() {
+  const container = document.getElementById('analysisResults');
+  const list = document.getElementById('detectionsList');
+  
+  list.innerHTML = '<div style="font-weight:bold;margin-bottom:10px;">Detecciones SEVERE Encontradas:</div>';
+  
+  if (analysisData.length === 0) {
+    list.innerHTML += '<div style="color:#999;">No se detectaron accidentes SEVERE en el video</div>';
+  } else {
+    analysisData.forEach((det, idx) => {
+      const item = document.createElement('div');
+      item.className = 'detection-result';
+      
+      // Mostrar frame si está disponible
+      let framePreview = '';
+      if (det.frame_path) {
+        const frameName = det.frame_path.split(/[\\/]/).pop();
+        const frameDir = det.frame_path.split(/[\\/]/).slice(-2, -1)[0];
+        framePreview = `<img src="${API_URL}/videos/frame/${frameDir}/${frameName}" style="width:100%;max-width:400px;margin-top:10px;border-radius:6px;" alt="Frame ${det.frame}">`;
+      }
+      
+      item.innerHTML = `
+        <div style="display:flex;justify-content:space-between;">
+          <div><strong>Detección ${idx + 1}:</strong> ACCIDENTE SEVERE</div>
+          <div style="color:#4CAF50;">Confianza: ${(det.confidence * 100).toFixed(1)}%</div>
+        </div>
+        <div style="font-size:12px;color:#999;margin-top:4px;">⏱️ ${det.timestamp} (Frame: ${det.frame})</div>
+        ${framePreview}
+      `;
+      list.appendChild(item);
+    });
+    
+    // Agregar botón para descargar video anotado
+    if (window.currentAnnotatedVideoPath) {
+      const downloadBtn = document.createElement('button');
+      downloadBtn.className = 'btn btn-success';
+      downloadBtn.style.marginTop = '15px';
+      downloadBtn.innerHTML = '🎬 Descargar Video Anotado';
+      downloadBtn.onclick = downloadAnnotatedVideo;
+      list.appendChild(downloadBtn);
+    }
+  }
+  
+  container.style.display = 'block';
+}
+
+async function downloadAnnotatedVideo() {
+  if (!window.currentAnnotatedVideoPath) {
+    showToast('No hay video anotado disponible', 'warning');
+    return;
+  }
+  
+  try {
+    const response = await fetch(`${API_URL}/videos/download-annotated`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        video_path: window.currentAnnotatedVideoPath
+      })
+    });
+    
+    if (response.ok) {
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'video_anotado_' + new Date().getTime() + '.mp4';
+      a.click();
+      
+      showToast('Video anotado descargado', 'success');
+    }
+  } catch (error) {
+    showToast('Error descargando video', 'error');
+  }
+}
+  // ============================================
+  // ESTADÍSTICAS
+  // ============================================
+
+  let charts = {};
+
+  function initCharts() {
+    createHourChart();
+    createZoneChart();
+    createCameraChart();
+  }
+
+  function createHourChart() {
+    const ctx = document.getElementById('hourChart').getContext('2d');
+    if (charts.hour) charts.hour.destroy();
+    
+    const hourData = [0,0,0,0,0,0];
+    accidents.forEach(acc => {
+      const hour = new Date(acc.fecha_accidente).getHours();
+      const slot = Math.floor(hour / 4);
+      hourData[slot]++;
+    });
+    
+    charts.hour = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ['00-04', '04-08', '08-12', '12-16', '16-20', '20-24'],
+        datasets: [{
+          label: 'Accidentes SEVERE',
+          data: hourData,
+          backgroundColor: '#E53935'
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { labels: { color: '#E0E0E0' } } },
+        scales: {
+          y: { ticks: { color: '#E0E0E0' }, grid: { color: '#444' } },
+          x: { ticks: { color: '#E0E0E0' }, grid: { color: '#444' } }
+        }
+      }
+    });
+  }
+
+  function createZoneChart() {
+    const ctx = document.getElementById('zoneChart').getContext('2d');
+    if (charts.zone) charts.zone.destroy();
+    
+    const zoneData = {};
+    accidents.forEach(acc => {
+      const zone = acc.camera_ip || `Cámara ${acc.id_camara}`;
+      zoneData[zone] = (zoneData[zone] || 0) + 1;
+    });
+    
+    const labels = Object.keys(zoneData);
+    const data = Object.values(zoneData);
+    
+    if (labels.length === 0) {
+      labels.push('Sin datos');
+      data.push(0);
+    }
+    
+    charts.zone = new Chart(ctx, {
+      type: 'pie',
+      data: {
+        labels: labels,
+        datasets: [{
+          data: data,
+          backgroundColor: ['#E53935', '#FF9800', '#4CAF50', '#007ACC', '#9C27B0']
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { labels: { color: '#E0E0E0' } } }
+      }
+    });
+  }
+
+  function createCameraChart() {
+    const ctx = document.getElementById('cameraChart').getContext('2d');
+    if (charts.camera) charts.camera.destroy();
+    
+    const cameraData = {};
+    accidents.forEach(acc => {
+      const camId = acc.id_camara;
+      cameraData[camId] = (cameraData[camId] || 0) + 1;
+    });
+    
+    const labels = Object.keys(cameraData).map(id => `Cámara ${id}`);
+    const data = Object.values(cameraData);
+    
+    if (labels.length === 0) {
+      labels.push('Cámara 1');
+      data.push(0);
+    }
+    
+    charts.camera = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Detecciones SEVERE',
+          data: data,
+          borderColor: '#4CAF50',
+          backgroundColor: 'rgba(76, 175, 80, 0.1)',
+          tension: 0.4
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { labels: { color: '#E0E0E0' } } },
+        scales: {
+          y: { ticks: { color: '#E0E0E0' }, grid: { color: '#444' } },
+          x: { ticks: { color: '#E0E0E0' }, grid: { color: '#444' } }
+        }
+      }
+    });
+  }
+
+  // ============================================
+  // USUARIOS
+  // ============================================
+
+  function renderUsers() {
+    const table = document.getElementById('usersTable');
+    table.innerHTML = '';
+    
+    if (users.length === 0) {
+      table.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#999;">No hay usuarios registrados</td></tr>';
+      return;
+    }
+    
+    users.forEach(user => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${user.id}</td>
+        <td>${user.nombre}</td>
+        <td>${user.correo}</td>
+        <td>${user.rol}</td>
+        <td><span style="color:#4CAF50;">Activo</span></td>
+        <td>
+          <button class="btn btn-danger" onclick="deleteUser(${user.id})" style="font-size:11px;padding:4px 8px;">🗑️</button>
+        </td>
+      `;
+      table.appendChild(tr);
+    });
+    
+    document.getElementById("dash-users").innerText = users.length;
+  }
+
+  function openUserModal() {
+    document.getElementById('userName').value = '';
+    document.getElementById('userEmail').value = '';
+    document.getElementById('userRole').value = 'operador';
+    document.getElementById('userModal').classList.add('show');
+  }
+
+  function closeUserModal() {
+    document.getElementById('userModal').classList.remove('show');
+  }
+
+  async function saveUser() {
+    const data = {
+      nombre: document.getElementById('userName').value,
+      correo: document.getElementById('userEmail').value,
+      password: 'cambiar123',
+      rol: document.getElementById('userRole').value
+    };
+    
+    if (!data.nombre || !data.correo) {
+      showToast('Complete nombre y correo', 'error');
+      return;
+    }
+    
+    try {
+      const response = await fetch(`${API_URL}/users`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        showToast('Usuario agregado (password: cambiar123)', 'success');
+        closeUserModal();
+        loadUsers();
+      } else {
+        showToast('Error: ' + result.error, 'error');
+      }
+    } catch (error) {
+      showToast('Error agregando usuario', 'error');
+    }
+  }
+
+  async function deleteUser(id) {
+    if (!confirm('¿Eliminar este usuario?')) return;
+    
+    try {
+      const response = await fetch(`${API_URL}/users/${id}`, {
+        method: 'DELETE'
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        showToast('Usuario eliminado', 'success');
+        loadUsers();
+      }
+    } catch (error) {
+      showToast('Error eliminando usuario', 'error');
+    }
+  }
+
+  // ============================================
+  // CONFIGURACIÓN
+  // ============================================
+
+  async function saveConfig() {
+    showToast('Configuración guardada localmente', 'info');
+  }
+
+  // ============================================
+  // MAPA Y REPORTES
+  // ============================================
+
+  function toggleHeatmap() {
+    const info = document.getElementById('heatmapInfo');
+    const isActive = info.style.display !== 'none';
+    info.style.display = isActive ? 'none' : 'block';
+    showToast(isActive ? 'Mapa de calor desactivado' : 'Mapa de calor activado', 'info');
+    }
+
+  function showAllCameras() {
+    const cams = cameras.length;
+    showToast(`${cams} cámaras en el sistema`, 'info');
+  }
+
+  function generateReport() {
+    showToast('Generando reporte...', 'info');
+  }
+
+  function renderReports() {
+    showToast('Cargando reportes...', 'info');
+  }
+
+  // ============================================
+  // DASHBOARD
+  // ============================================
+
+  function updateDashboard() {
+    document.getElementById('dash-cams').innerText = cameras.length;
+    document.getElementById('dash-accidents').innerText = accidents.length;
+    document.getElementById('dash-users').innerText = users.length;
+  }
+
+  // ============================================
+  // UTILIDADES
+  // ============================================
+
+  function showToast(message, type = 'info') {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.innerHTML = `<strong>${type.toUpperCase()}:</strong> ${message}`;
+    container.appendChild(toast);
+    setTimeout(() => toast.remove(), 4000);
+  }
+
+  // Reloj
+  setInterval(() => {
+    document.getElementById("current-time").innerText = new Date().toLocaleTimeString();
+  }, 1000);
+
+  // ============================================
+  // INICIALIZACIÓN
+  // ============================================
+
+  window.onload = function() {
+    console.log('Iniciando aplicación...');
+    showToast('Conectando con el backend...', 'info');
+  };
+</script>
+</body>
+</html>

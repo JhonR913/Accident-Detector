@@ -1,0 +1,41 @@
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Environment variables
+.env
+.env.local
+
+# Archivos subidos
+uploads/*
+clips/*
+snapshots/*
+
+# Excepciones (mantener carpetas vacías)
+!uploads/.gitkeep
+!clips/.gitkeep
+!snapshots/.gitkeep
+
+# Modelo YOLO (si es muy pesado)
+# models/best.pt
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
