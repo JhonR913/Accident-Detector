@@ -1,19 +1,24 @@
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, send_from_directory, Response
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
 import logging
 import os
+import cv2
 from datetime import datetime
 
 from config import Config
 from database import db
 from services.camera_service import CameraManager
 from services.video_service import VideoService
-from flask import send_file
-from flask import send_file, send_from_directory
 
 FRONTEND_DIR = r"C:\Users\Ramirez\Desktop\ACCIDENT\FRONTED"
+
+# Inicializar Flask
 app = Flask(__name__, static_folder=FRONTEND_DIR, static_url_path='')
+
+# Configuración
+app.config['SECRET_KEY'] = 'accident-detection-secret-key'
+app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500 MB max
 
 # Configurar logging
 logging.basicConfig(
@@ -22,22 +27,65 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Inicializar Flask
-app = Flask(__name__)
-app.config['SECRET_KEY'] = 'accident-detection-secret-key'
-app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500 MB max
+# CORS
+CORS(app, resources={r"/*": {"origins": "*"}})
 
-CORS(app)
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+# Socket.IO con configuración optimizada
+socketio = SocketIO(
+    app,
+    cors_allowed_origins="*",
+    async_mode='threading',  # Cambiar de 'eventlet' a 'threading'
+    logger=True,
+    engineio_logger=False,  # Reducir ruido en logs
+    ping_timeout=60,
+    ping_interval=25,
+    max_http_buffer_size=10000000  # 10MB para frames grandes
+)
 
 # Inicializar servicios
 Config.init_folders()
-camera_manager = CameraManager(socketio)
+camera_manager = CameraManager(socketio, use_yolo=  True)
 
 logger.info("=" * 60)
 logger.info("🚨 SISTEMA DE DETECCIÓN DE ACCIDENTES INICIADO")
 logger.info("=" * 60)
 
+# ============================================
+# WEBSOCKET EVENTS
+# ============================================
+
+@socketio.on('connect')
+def handle_connect():
+    logger.info(f"✅ Cliente conectado: {request.sid}")
+    emit('connection_response', {
+        'status': 'connected',
+        'message': 'Conexión establecida con el servidor',
+        'timestamp': datetime.now().isoformat()
+    })
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    logger.info(f"❌ Cliente desconectado: {request.sid}")
+
+@socketio.on('ping')
+def handle_ping():
+    """Responder a ping del cliente"""
+    emit('pong', {'timestamp': datetime.now().isoformat()})
+
+@socketio.on('request_camera_list')
+def handle_camera_list_request():
+    """Cliente solicita lista de cámaras"""
+    try:
+        cameras = db.get_all_cameras()
+        active = camera_manager.get_active_cameras()
+        
+        for cam in cameras:
+            cam['is_streaming'] = cam['id'] in active
+        
+        emit('camera_list', {'cameras': cameras})
+    except Exception as e:
+        logger.error(f"Error enviando lista de cámaras: {e}")
+        emit('error', {'message': str(e)})
 
 # ============================================
 # ENDPOINTS - CÁMARAS
@@ -54,6 +102,7 @@ def get_cameras():
         for cam in cameras:
             cam['is_streaming'] = cam['id'] in active
         
+        logger.info(f"📹 Enviando {len(cameras)} cámaras ({len(active)} activas)")
         return jsonify({'success': True, 'cameras': cameras})
     except Exception as e:
         logger.error(f"Error obteniendo cámaras: {e}")
@@ -91,32 +140,11 @@ def add_camera():
             url_rtsp=data['url_rtsp']
         )
         
-        logger.info(f"✓ Cámara agregada - ID: {camera_id}")
+        logger.info(f"✅ Cámara agregada - ID: {camera_id}, IP: {data['ip']}")
         return jsonify({'success': True, 'camera_id': camera_id, 'message': 'Cámara agregada correctamente'})
     
     except Exception as e:
         logger.error(f"Error agregando cámara: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@app.route('/api/cameras/<int:camera_id>', methods=['PUT'])
-def update_camera(camera_id):
-    """Actualizar cámara"""
-    try:
-        data = request.json
-        
-        db.update_camera(
-            camera_id=camera_id,
-            ip=data['ip'],
-            puerto=data['puerto'],
-            usuario=data['usuario'],
-            password=data['password'],
-            latitud=data['latitud'],
-            longitud=data['longitud'],
-            url_rtsp=data['url_rtsp']
-        )
-        
-        return jsonify({'success': True, 'message': 'Cámara actualizada'})
-    except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/cameras/<int:camera_id>', methods=['DELETE'])
@@ -124,11 +152,14 @@ def delete_camera(camera_id):
     """Eliminar cámara"""
     try:
         # Detener stream si está activo
-        camera_manager.stop_camera(camera_id)
+        if camera_manager.is_camera_active(camera_id):
+            camera_manager.stop_camera(camera_id)
         
         db.delete_camera(camera_id)
+        logger.info(f"🗑️ Cámara {camera_id} eliminada")
         return jsonify({'success': True, 'message': 'Cámara eliminada'})
     except Exception as e:
+        logger.error(f"Error eliminando cámara: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 # ============================================
@@ -139,6 +170,7 @@ def delete_camera(camera_id):
 def start_camera_stream(camera_id):
     """Iniciar stream de cámara"""
     try:
+        logger.info(f"▶️ Iniciando stream - Cámara {camera_id}")
         success = camera_manager.start_camera(camera_id)
         
         if success:
@@ -146,12 +178,14 @@ def start_camera_stream(camera_id):
         else:
             return jsonify({'success': False, 'error': 'No se pudo iniciar el stream'}), 500
     except Exception as e:
+        logger.error(f"Error iniciando stream: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/cameras/<int:camera_id>/stop', methods=['POST'])
 def stop_camera_stream(camera_id):
     """Detener stream de cámara"""
     try:
+        logger.info(f"⏹️ Deteniendo stream - Cámara {camera_id}")
         success = camera_manager.stop_camera(camera_id)
         
         if success:
@@ -159,6 +193,7 @@ def stop_camera_stream(camera_id):
         else:
             return jsonify({'success': False, 'error': 'Stream no estaba activo'}), 400
     except Exception as e:
+        logger.error(f"Error deteniendo stream: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 # ============================================
@@ -173,6 +208,7 @@ def get_accidents():
         accidents = db.get_all_accidents(limit)
         return jsonify({'success': True, 'accidents': accidents, 'total': len(accidents)})
     except Exception as e:
+        logger.error(f"Error obteniendo accidentes: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/accidents/camera/<int:camera_id>', methods=['GET'])
@@ -280,76 +316,33 @@ def analyze_video():
         logger.error(f"Error analizando video: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@app.route('/api/videos/download-report', methods=['POST'])
-def download_report():
-    """Descargar reporte de análisis"""
+@app.route('/api/videos/download-annotated', methods=['POST'])
+def download_annotated_video():
+    """Descargar video con anotaciones"""
     try:
         data = request.json
-        report_path = data.get('report_path')
+        video_path = data.get('video_path')
         
-        if not report_path or not os.path.exists(report_path):
-            return jsonify({'success': False, 'error': 'Reporte no encontrado'}), 404
+        if not video_path or not os.path.exists(video_path):
+            return jsonify({'success': False, 'error': 'Video no encontrado'}), 404
         
-        return send_file(report_path, as_attachment=True)
+        return send_file(video_path, as_attachment=True, download_name='video_anotado.mp4')
     
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-# ============================================
-# WEBSOCKET EVENTS
-# ============================================
-
-@socketio.on('connect')
-def handle_connect():
-    logger.info(f"Cliente conectado: {request.sid}")
-    emit('connection_response', {'status': 'connected'})
-
-@socketio.on('disconnect')
-def handle_disconnect():
-    logger.info(f"Cliente desconectado: {request.sid}")
-
-@socketio.on('request_camera_list')
-def handle_camera_list_request():
-    """Cliente solicita lista de cámaras"""
+@app.route('/api/videos/frame/<path:frame_path>', methods=['GET'])
+def get_detection_frame(frame_path):
+    """Obtener frame de detección"""
     try:
-        cameras = db.get_all_cameras()
-        emit('camera_list', {'cameras': cameras})
-    except Exception as e:
-        emit('error', {'message': str(e)})
-
-# ============================================
-# ENDPOINT PRINCIPAL
-# ============================================
-
-
-@app.route('/')
-def index():
-    # Servir index.html desde la carpeta FRONTED
-    index_path = os.path.join(FRONTEND_DIR, 'index.html')
-    if os.path.exists(index_path):
-        return send_file(index_path)
-    # Si no existe, devolver error claro para debugging
-    return jsonify({'error': 'index.html no encontrado', 'path_checked': index_path}), 500
-
-
-@app.route('/api/health', methods=['GET'])
-def health_check():
-    """Health check del sistema"""
-    try:
-        # Verificar BD
-        db.execute_query("SELECT 1", fetch=True)
+        full_path = os.path.join(Config.UPLOAD_FOLDER, frame_path)
+        if not os.path.exists(full_path):
+            return jsonify({'error': 'Frame no encontrado'}), 404
         
-        return jsonify({
-            'status': 'healthy',
-            'database': 'connected',
-            'active_streams': len(camera_manager.get_active_cameras()),
-            'timestamp': datetime.now().isoformat()
-        })
+        return send_file(full_path, mimetype='image/jpeg')
     except Exception as e:
-        return jsonify({
-            'status': 'unhealthy',
-            'error': str(e)
-        }), 500
+        return jsonify({'error': str(e)}), 500
+
 # ============================================
 # ENDPOINTS - USUARIOS
 # ============================================
@@ -401,35 +394,36 @@ def delete_user(user_id):
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+# ============================================
+# ENDPOINT PRINCIPAL
+# ============================================
 
-@app.route('/api/videos/download-annotated', methods=['POST'])
-def download_annotated_video():
-    """Descargar video con anotaciones"""
-    try:
-        data = request.json
-        video_path = data.get('video_path')
-        
-        if not video_path or not os.path.exists(video_path):
-            return jsonify({'success': False, 'error': 'Video no encontrado'}), 404
-        
-        return send_file(video_path, as_attachment=True, download_name='video_anotado.mp4')
-    
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+@app.route('/')
+def index():
+    """Servir frontend"""
+    index_path = os.path.join(FRONTEND_DIR, 'index.html')
+    if os.path.exists(index_path):
+        return send_file(index_path)
+    return jsonify({'error': 'index.html no encontrado', 'path_checked': index_path}), 500
 
-@app.route('/api/videos/frame/<path:frame_path>', methods=['GET'])
-def get_detection_frame(frame_path):
-    """Obtener frame de detección"""
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    """Health check del sistema"""
     try:
-        full_path = os.path.join(Config.UPLOAD_FOLDER, frame_path)
-        if not os.path.exists(full_path):
-            return jsonify({'error': 'Frame no encontrado'}), 404
+        # Verificar BD
+        db.execute_query("SELECT 1", fetch=True)
         
-        return send_file(full_path, mimetype='image/jpeg')
+        return jsonify({
+            'status': 'healthy',
+            'database': 'connected',
+            'active_streams': len(camera_manager.get_active_cameras()),
+            'timestamp': datetime.now().isoformat()
+        })
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
-    
-    
+        return jsonify({
+            'status': 'unhealthy',
+            'error': str(e)
+        }), 500
 
 # ============================================
 # MAIN
@@ -437,12 +431,22 @@ def get_detection_frame(frame_path):
 
 if __name__ == '__main__':
     try:
-        logger.info(f"Servidor iniciando en {Config.HOST}:{Config.PORT}")
-        socketio.run(app, host=Config.HOST, port=Config.PORT, debug=Config.DEBUG)
+        logger.info(f"🚀 Servidor iniciando en {Config.HOST}:{Config.PORT}")
+        logger.info(f"📁 Frontend: {FRONTEND_DIR}")
+        logger.info(f"🎥 YOLO: {'Activado' if camera_manager.use_yolo else 'Desactivado'}")
+        logger.info("=" * 60)
+        
+        socketio.run(
+            app,
+            host=Config.HOST,
+            port=Config.PORT,
+            debug=Config.DEBUG,
+            use_reloader=False  # Importante: desactivar reloader con threading
+        )
     except KeyboardInterrupt:
         logger.info("\n🛑 Deteniendo servidor...")
         camera_manager.stop_all()
-        logger.info("✓ Servidor detenido correctamente")
+        logger.info("✅ Servidor detenido correctamente")
     except Exception as e:
-        logger.error(f"Error fatal: {e}")
+        logger.error(f"💥 Error fatal: {e}")
         camera_manager.stop_all()

@@ -77,7 +77,7 @@
     .dvr-cell{background:#252526;border:2px solid #444;border-radius:6px;aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;position:relative;cursor:pointer;transition:border 0.3s;overflow:hidden;}
     .dvr-cell:hover{border-color:#007ACC;}
     .dvr-cell img{width:100%;height:100%;object-fit:cover;}
-    .dvr-cell.fullscreen{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:1000;border-radius:0;}
+    .dvr-cell.fullscreen{position:fixed !important;top:0 !important;left:0 !important;width:100vw !important;height:100vh !important;z-index:1000 !important;border-radius:0 !important;background:#000 !important;cursor:pointer !important;aspect-ratio:auto !important;}
     .dvr-label{position:absolute;top:10px;left:10px;background:rgba(0,0,0,0.7);padding:5px 10px;border-radius:4px;font-size:12px;z-index:10;}
     
     /* Detection Panel */
@@ -470,7 +470,38 @@
   // CONFIGURACIÓN
   // ============================================
   const API_URL = 'http://localhost:5000/api';
-  const socket = io('http://localhost:5000');
+
+  // ============================================
+// CONEXIÓN WEBSOCKET (Socket.IO)
+// ============================================
+  const socket = io('http://localhost:5000', {
+    
+    transports: ['websocket'],  // Fuerza WebSocket (sin polling)
+    path: '/socket.io',
+    reconnection: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 2000
+  });
+  socket.onAny((event, data) => {
+    console.log('📨 Evento recibido:', event, data);
+  });
+
+  socket.on('connect', () => {
+    console.log('✅ Socket conectado correctamente al backend');
+    showToast('Conectado al servidor', 'success');
+    loadAllData();
+  });
+
+  socket.on('disconnect', () => {
+    console.warn('⚠️ Socket desconectado');
+    showToast('Desconectado del servidor', 'warning');
+  });
+
+  socket.on('connect_error', (err) => {
+    console.error('❌ Error al conectar con backend:', err.message);
+    showToast('Error al conectar con backend', 'error');
+  });
+
 
   // Estado global
   let cameras = [];
@@ -500,19 +531,72 @@
     showToast(`ACCIDENTE SEVERE - Cámara ${data.camera_ip} (${data.confidence}%)`, 'error');
     addDetectionToFeed(data);
     document.getElementById('last-detection').innerText = new Date().toLocaleTimeString();
-    loadAccidents
-    ();
-  });
-
-  // Escuchar frames de cámaras en tiempo real
-  socket.on('camera_frame', (data) => {
-    updateCameraFrame(data.camera_id, data.frame, data.is_recording);
-  });
-
-  socket.on('recording_finished', (data) => {
-    showToast(`Grabación finalizada - Cámara ${data.camera_id}`, 'info');
+    
+    // Actualizar gráficas en tiempo real
+    updateChartsWithNewDetection(data);
+    
+    // Recargar registros
     loadAccidents();
   });
+
+
+
+
+  // ============================================
+// RECEPCIÓN DE FRAMES DE CÁMARA
+// ============================================
+  socket.on('camera_frame', function(data) {
+  if (!data || !data.frame) {
+    console.warn('⚠️ Frame vacío');
+    return;
+  }
+  
+  console.log('📹 Frame recibido de cámara', data.camera_id, '- Tamaño:', data.frame.length);
+  
+  const cameraId = data.camera_id.toString(); // Asegurar que es string
+  const frameData = 'data:image/jpeg;base64,' + data.frame;
+  
+  // 1️⃣ Actualizar preview en página "Cámaras"
+  const previewImg = document.getElementById('cam-preview-' + cameraId);
+  if (previewImg) {
+    previewImg.src = frameData;
+    previewImg.style.display = 'block';
+    console.log('✅ Preview actualizado para cámara', cameraId);
+  } else {
+    console.warn('⚠️ Preview no encontrado para cámara', cameraId);
+  }
+  
+  // 2️⃣ Actualizar "Monitoreo DVR"
+  const dvrImg = document.getElementById('dvr-stream-' + cameraId);
+  const waiting = document.getElementById('dvr-waiting-' + cameraId);
+
+  if (dvrImg) {
+    dvrImg.src = frameData;
+    dvrImg.style.display = 'block';
+    
+    if (waiting) waiting.style.display = 'none';
+    console.log('✅ DVR actualizado para cámara', cameraId);
+  } else {
+    console.warn('⚠️ DVR img no encontrada para cámara', cameraId);
+  }
+  
+  // 3️⃣ Marcar borde rojo si está grabando
+  const cell = document.querySelector('.dvr-cell[data-camera-id="' + cameraId + '"]');
+  if (cell) {
+    if (data.is_recording) {
+      cell.style.borderColor = '#E53935';
+      cell.style.borderWidth = '4px';
+      cell.style.boxShadow = '0 0 20px rgba(229, 57, 53, 0.5)';
+    } else {
+      // Restaurar estilo
+      cell.style.borderColor = '';
+      cell.style.borderWidth = '';
+      cell.style.boxShadow = '';
+    }
+  }
+});
+
+
 
   // ============================================
   // FUNCIONES DE CARGA DE DATOS REALES
@@ -870,29 +954,37 @@ function showAllCameras() {
     const grid = document.getElementById('dvrGrid');
     grid.className = `dvr-grid grid-${currentGrid}`;
     grid.innerHTML = '';
-    
+  
     for (let i = 0; i < currentGrid; i++) {
       const cell = document.createElement('div');
       cell.className = 'dvr-cell';
       cell.dataset.cameraId = cameras[i]?.id || '';
-      
+    
       if (i < cameras.length) {
         const cam = cameras[i];
+      
+      // ===== AGREGAR DOBLE CLICK PARA PANTALLA COMPLETA =====
+        cell.addEventListener('dblclick', function() {
+          toggleFullscreen(this);
+        });
+      
         cell.innerHTML = `
           <div class="dvr-label">Cámara ${cam.id} - ${cam.ip}</div>
-          <div style="color:#999;padding:20px;">Esperando stream...</div>
+          <img id="dvr-stream-${cam.id}" style="width:100%;height:100%;object-fit:cover;display:none;" alt="Stream">
+          <div id="dvr-waiting-${cam.id}" style="color:#999;padding:20px;">Esperando stream...</div>
           <div style="position:absolute;bottom:10px;left:10px;z-index:10;">
-            <button class="btn btn-success" onclick="startCameraStream(${cam.id})" style="font-size:10px;padding:4px 8px;">▶️ Iniciar</button>
-            <button class="btn btn-danger" onclick="stopCameraStream(${cam.id})" style="font-size:10px;padding:4px 8px;">⏹️ Detener</button>
+            <button class="btn btn-success" onclick="startCameraStream(${cam.id}); event.stopPropagation();" style="font-size:10px;padding:4px 8px;">▶️ Iniciar</button>
+            <button class="btn btn-danger" onclick="stopCameraStream(${cam.id}); event.stopPropagation();" style="font-size:10px;padding:4px 8px;">⏹️ Detener</button>
           </div>
         `;
       } else {
         cell.innerHTML = '<div style="color:#666;">Sin cámara asignada</div>';
       }
-      
+    
       grid.appendChild(cell);
     }
   }
+  
 
   async function startCameraStream(cameraId) {
     try {
@@ -930,13 +1022,74 @@ function showAllCameras() {
     }
   }
 
-  function updateCameraFrame(cameraId, frameBase64, isRecording) {
-    // Actualizar en vista de cámaras
-    const preview = document.getElementById(`cam-preview-${cameraId}`);
-    if (preview) {
-      preview.src = 'data:image/jpeg;base64,' + frameBase64;
-    }
+// ============================================
+// ACTUALIZAR FRAME DE CÁMARA
+// ============================================
+function updateCameraFrame(cameraId, frameBase64, isRecording) {
+  if (!frameBase64 || frameBase64.length < 50) {
+    console.warn(`⚠️ Frame vacío para cámara ${cameraId}`);
+    return;
+  }
+
+  const safeFrame = `data:image/jpeg;base64,${frameBase64.trim()}`;
+
+  // DVR principal
+  const dvrImg = document.querySelector(`.dvr-cell[data-camera-id="${cameraId}"] img`);
+  if (dvrImg) {
+    dvrImg.src = safeFrame;
+    dvrImg.style.display = 'block';
+  }
+
+  // En la vista de lista de cámaras
+  const preview = document.getElementById(`cam-preview-${cameraId}`);
+  if (preview) {
+    preview.src = safeFrame;
+  }
+}
+
+
+  // ============================================
+// PANTALLA COMPLETA
+// ============================================
+
+  let fullscreenCell = null;
+
+  function toggleFullscreen(cell) {
+  // Si ya hay una celda en pantalla completa
+    if (fullscreenCell) {
+    // Salir de pantalla completa
+      fullscreenCell.classList.remove('fullscreen');
+      fullscreenCell = null;
     
+    // Re-renderizar el grid para restaurar todo
+      setTimeout(() => renderDVRGrid(), 100);
+    
+      showToast('Saliendo de pantalla completa', 'info');
+      return;
+    }
+  
+  // Entrar a pantalla completa
+    cell.classList.add('fullscreen');
+    fullscreenCell = cell;
+  
+  // Ocultar botones en pantalla completa
+    const buttons = cell.querySelector('[style*="position:absolute"]');
+    if (buttons) {
+      buttons.style.display = 'none';
+    }
+  
+    showToast('Doble click nuevamente o presiona ESC para salir', 'info');
+  
+  // Agregar listener para ESC
+    const escapeHandler = (e) => {
+      if (e.key === 'Escape' && fullscreenCell) {
+        toggleFullscreen(fullscreenCell);
+        document.removeEventListener('keydown', escapeHandler);
+      }
+    };
+  
+    document.addEventListener('keydown', escapeHandler);
+  }  
     // Actualizar en DVR
     const cells = document.querySelectorAll('.dvr-cell');
     cells.forEach(cell => {
@@ -967,7 +1120,7 @@ function showAllCameras() {
         }
       }
     });
-  }
+
 
   function addDetectionToFeed(data) {
     const feed = document.getElementById('detection-feed');

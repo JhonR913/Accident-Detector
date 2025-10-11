@@ -33,7 +33,7 @@ class Config:
     # RTSP
     RTSP_RECONNECT_ATTEMPTS = 3
     RTSP_TIMEOUT = 10
-    FRAME_SKIP = 2
+    FRAME_SKIP = 1
     
     # Video output
     VIDEO_CODEC = 'mp4v'
