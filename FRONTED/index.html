@@ -30,7 +30,7 @@
     .system-status{background:rgba(255,255,255,0.05);border:1px solid #444;border-radius:8px;padding:15px;min-width:250px;}
     .status-item{display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px;}
     .status-indicator{width:10px;height:10px;border-radius:50%;background:#4CAF50;animation:pulse 2s infinite;}
-    @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+    @keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:0.8;transform:scale(1.05);}}
     .main-content{display:flex;flex:1;overflow:hidden;}
     .sidebar{width:220px;background:linear-gradient(to bottom,#252526,#1E1E1E);border-right:2px solid #444;overflow-y:auto;padding:20px 0 120px 0;}
     .menu-button{width:190px;height:45px;margin:5px 15px;border:none;border-radius:8px;color:#E0E0E0;font-family:inherit;cursor:pointer;transition:all 0.3s;font-size:14px;display:flex;align-items:center;gap:10px;padding-left:15px;}
@@ -82,7 +82,8 @@
     
     /* Detection Panel */
     .detection-panel{background:#1E1E1E;border:1px solid #444;border-radius:8px;padding:15px;margin-bottom:15px;max-height:200px;overflow-y:auto;}
-    .detection-item{background:#252526;padding:10px;margin-bottom:8px;border-radius:6px;border-left:4px solid #E53935;display:flex;justify-content:space-between;align-items:center;}
+    .detection-item{background:#252526;padding:10px;margin-bottom:8px;border-radius:6px;border-left:4px solid #E53935;display:flex;justify-content:space-between;align-items:center;transition:all 0.3s ease;}
+    .detection-item:hover{transform:translateX(5px);box-shadow:0 4px 12px rgba(229,57,53,0.3);}
     
     /* Modal */
     .modal{display:none;position:fixed;z-index:1000;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,0.7);}
@@ -113,6 +114,65 @@
     
     /* Leaflet Map */
     #mapContainer{height:400px;border:1px solid #444;border-radius:8px;margin-top:10px;z-index:1;}
+    
+    /* NUEVOS ESTILOS PARA YOLO */
+    @keyframes borderPulse {
+      0%, 100% { 
+        border-color: #FF9800;
+        box-shadow: 0 0 10px rgba(255, 152, 0, 0.5);
+      }
+      50% { 
+        border-color: #E53935;
+        box-shadow: 0 0 20px rgba(229, 57, 53, 0.8);
+      }
+    }
+    
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+    
+    .dvr-cell[data-yolo-active="true"] {
+      border-color: #4CAF50 !important;
+      box-shadow: 0 0 15px rgba(76, 175, 80, 0.3);
+    }
+    
+    .dvr-cell[data-detecting="true"] {
+      animation: borderPulse 1s infinite;
+    }
+    
+    .socket-indicator {
+      position: fixed;
+      top: 90px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.8);
+      padding: 8px 15px;
+      border-radius: 20px;
+      font-size: 11px;
+      border: 1px solid #444;
+      z-index: 999;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .socket-indicator.connected { border-color: #4CAF50; }
+    .socket-indicator.disconnected { 
+      border-color: #E53935;
+      animation: blink 1s infinite;
+    }
+    
+    .socket-indicator-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #4CAF50;
+      animation: pulse 2s infinite;
+    }
+    
+    .socket-indicator.disconnected .socket-indicator-dot {
+      background: #E53935;
+    }
   </style>
 </head>
 <body>
@@ -130,6 +190,12 @@
         <div class="status-item"><span>Última Detección</span><span style="color:#FF9800;" id="last-detection">--:--:--</span></div>
         <div class="status-item"><span id="current-time">00:00:00</span></div>
       </div>
+    </div>
+
+    <!-- Indicador de conexión Socket.IO -->
+    <div class="socket-indicator connected" id="socketIndicator">
+      <div class="socket-indicator-dot"></div>
+      <span id="socketStatus">Conectado</span>
     </div>
 
     <!-- Main -->
@@ -238,6 +304,48 @@
         <div id="monitoreo" class="page">
           <div class="card">
             <div class="card-title">Monitoreo en Vivo - Vista DVR</div>
+            
+            <!-- Panel de Estado YOLO -->
+            <div class="card" style="margin-bottom:15px;background:linear-gradient(135deg, #1E1E1E 0%, #2D2D30 100%);">
+              <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:15px;">
+                <div style="flex:1;min-width:200px;">
+                  <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+                    <div style="width:40px;height:40px;background:#4CAF50;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;">🎯</div>
+                    <div>
+                      <div style="font-size:16px;font-weight:bold;">Sistema YOLO</div>
+                      <div style="font-size:11px;color:#4CAF50;">● Activo y Monitoreando</div>
+                    </div>
+                  </div>
+                  <div style="font-size:11px;color:#999;">Detección en tiempo real con verificación anti falsos positivos</div>
+                </div>
+                
+                <div style="flex:1;min-width:200px;background:rgba(255,255,255,0.03);padding:15px;border-radius:8px;border:1px solid #444;">
+                  <div style="font-size:12px;font-weight:bold;margin-bottom:10px;">⚙️ Configuración</div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11px;">
+                    <div style="color:#999;">Frames requeridos:</div>
+                    <div id="config-required-frames" style="color:#4CAF50;font-weight:bold;text-align:right;">25 consecutivos</div>
+                    <div style="color:#999;">Cooldown:</div>
+                    <div id="config-cooldown-seconds" style="color:#FF9800;font-weight:bold;text-align:right;">30 segundos</div>
+                    <div style="color:#999;">Confianza mínima:</div>
+                    <div style="color:#007ACC;font-weight:bold;text-align:right;">SEVERE</div>
+                  </div>
+                </div>
+                
+                <div style="flex:1;min-width:250px;background:rgba(229,57,53,0.1);padding:15px;border-radius:8px;border:1px solid #E53935;">
+                  <div style="font-size:12px;font-weight:bold;margin-bottom:10px;color:#E53935;">📊 Estadísticas Globales</div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                    <div style="text-align:center;background:rgba(255,152,0,0.2);padding:8px;border-radius:6px;">
+                      <div style="font-size:18px;font-weight:bold;color:#FF9800;" id="global-total-detections">0</div>
+                      <div style="color:#999;font-size:10px;">Detecciones</div>
+                    </div>
+                    <div style="text-align:center;background:rgba(229,57,53,0.2);padding:8px;border-radius:6px;">
+                      <div style="font-size:18px;font-weight:bold;color:#E53935;" id="global-confirmed-accidents">0</div>
+                      <div style="color:#999;font-size:10px;">Confirmados</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
             
             <!-- Detection Panel -->
             <div class="detection-panel">
@@ -469,12 +577,12 @@
   // ============================================
   // CONFIGURACIÓN
   // ============================================
-  const API_URL = 'http://localhost:5000/api';
+  const API_URL = 'https://accident-detector.site/api';
 
   // ============================================
 // CONEXIÓN WEBSOCKET (Socket.IO)
 // ============================================
-  const socket = io('http://localhost:5000', {
+  const socket = io('https://accident-detector.site', {
     
     transports: ['websocket'],  // Fuerza WebSocket (sin polling)
     path: '/socket.io',
@@ -487,12 +595,24 @@
   });
 
   socket.on('connect', () => {
+    const indicator = document.getElementById('socketIndicator');
+    const status = document.getElementById('socketStatus');
+    if (indicator && status) {
+      indicator.className = 'socket-indicator connected';
+      status.innerText = 'Conectado';
+    }
     console.log('✅ Socket conectado correctamente al backend');
     showToast('Conectado al servidor', 'success');
     loadAllData();
   });
 
   socket.on('disconnect', () => {
+    const indicator = document.getElementById('socketIndicator');
+    const status = document.getElementById('socketStatus');
+    if (indicator && status) {
+      indicator.className = 'socket-indicator disconnected';
+      status.innerText = 'Desconectado';
+    }
     console.warn('⚠️ Socket desconectado');
     showToast('Desconectado del servidor', 'warning');
   });
@@ -502,6 +622,32 @@
     showToast('Error al conectar con backend', 'error');
   });
 
+  // ============================================
+  // LISTENERS DE DETECCIÓN YOLO
+  // ============================================
+
+  // Escuchar detecciones TENTATIVAS (sin confirmar)
+  socket.on('tentative_detection', (data) => {
+    console.log('⚠️ Detección tentativa:', data);
+    updateDetectionProgress(data);
+  });
+
+  // Escuchar ACCIDENTES CONFIRMADOS
+  socket.on('severe_detected', (data) => {
+    console.log('🚨 ACCIDENTE CONFIRMADO:', data);
+    showToast(`ACCIDENTE CONFIRMADO - Cámara ${data.camera_ip} (${data.confidence}%)`, 'error');
+    addConfirmedDetectionToFeed(data);
+    playAlertSound();
+    showDesktopNotification(data);
+    document.getElementById('last-detection').innerText = new Date().toLocaleTimeString();
+    
+    // Actualizar gráficas en tiempo real
+    updateChartsWithNewDetection(data);
+    
+    // Recargar registros
+    loadAccidents();
+    updateGlobalStats();
+  });
 
   // Estado global
   let cameras = [];
@@ -512,35 +658,190 @@
   let marker = null;
 
   // ============================================
-  // CONEXIÓN WEBSOCKET
+  // FUNCIONES DE DETECCIÓN VISUAL
   // ============================================
-  socket.on('connect', () => {
-    console.log('✓ Conectado al backend');
-    showToast('Conectado al servidor', 'success');
-    loadAllData();
-  });
 
-  socket.on('disconnect', () => {
-    console.log('✗ Desconectado del backend');
-    showToast('Desconectado del servidor', 'warning');
-  });
-
-  // Escuchar detecciones SEVERE en tiempo real
-  socket.on('severe_detected', (data) => {
-    console.log('🚨 ACCIDENTE SEVERE:', data);
-    showToast(`ACCIDENTE SEVERE - Cámara ${data.camera_ip} (${data.confidence}%)`, 'error');
-    addDetectionToFeed(data);
-    document.getElementById('last-detection').innerText = new Date().toLocaleTimeString();
+function updateDetectionProgress(data) {
+  const feed = document.getElementById('detection-feed');
+  let progressItem = document.getElementById(`progress-cam-${data.camera_id}`);
+  
+  if (!progressItem) {
+    const waiting = feed.querySelector('[style*="text-align:center"]');
+    if (waiting) waiting.remove();
     
-    // Actualizar gráficas en tiempo real
-    updateChartsWithNewDetection(data);
+    progressItem = document.createElement('div');
+    progressItem.id = `progress-cam-${data.camera_id}`;
+    progressItem.className = 'detection-item';
+    progressItem.style.borderLeft = '4px solid #FF9800';
+    progressItem.style.background = '#2a2a2a';
+    feed.insertBefore(progressItem, feed.firstChild);
+  }
+  
+  // ✅ USAR VALORES DEL BACKEND (no hardcodear)
+  const progress = (data.consecutive_frames / data.required_frames) * 100;
+  const progressColor = progress >= 100 ? '#4CAF50' : '#FF9800';
+  
+  progressItem.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <div style="flex:1;">
+        <div style="font-weight:bold;color:#FF9800;">⚠️ VERIFICANDO ACCIDENTE</div>
+        <div style="font-size:11px;color:#999;margin-top:4px;">
+          Cámara ${data.camera_ip} - ${new Date(data.timestamp).toLocaleTimeString()}
+        </div>
+        <div style="font-size:11px;color:#4CAF50;margin-top:2px;">
+          Confianza: ${data.confidence}%
+        </div>
+        <div style="margin-top:8px;">
+          <div style="background:#1E1E1E;border-radius:10px;height:20px;overflow:hidden;">
+            <div style="background:${progressColor};height:100%;width:${progress}%;transition:width 0.3s;display:flex;align-items:center;justify-content:center;color:#000;font-size:10px;font-weight:bold;">
+              ${data.consecutive_frames}/${data.required_frames}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="margin-left:15px;">
+        <div style="width:50px;height:50px;border-radius:50%;border:3px solid ${progressColor};display:flex;align-items:center;justify-content:center;font-size:18px;">
+          ${progress >= 100 ? '✓' : '...'}
+        </div>
+      </div>
+    </div>
+  `;
+  
+  setTimeout(() => {
+    if (progressItem && progressItem.parentNode) {
+      progressItem.style.opacity = '0';
+      progressItem.style.transition = 'opacity 0.5s';
+      setTimeout(() => progressItem.remove(), 500);
+    }
+  }, 5000);
+}
+
+  function addConfirmedDetectionToFeed(data) {
+    const feed = document.getElementById('detection-feed');
+    const progressItem = document.getElementById(`progress-cam-${data.camera_id}`);
+    if (progressItem) progressItem.remove();
     
-    // Recargar registros
-    loadAccidents();
+    const item = document.createElement('div');
+    item.className = 'detection-item';
+    item.style.borderLeft = '4px solid #E53935';
+    item.style.background = '#2D1B1B';
+    item.style.animation = 'pulse 2s ease-in-out 3';
+    
+    item.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-weight:bold;color:#E53935;display:flex;align-items:center;gap:8px;">
+            🚨 ACCIDENTE CONFIRMADO
+            <span style="background:#E53935;color:#fff;padding:2px 8px;border-radius:4px;font-size:10px;">SEVERE</span>
+          </div>
+          <div style="font-size:11px;color:#999;margin-top:4px;">
+            Cámara ${data.camera_ip} - ${new Date(data.timestamp).toLocaleTimeString()}
+          </div>
+          <div style="font-size:11px;color:#4CAF50;margin-top:2px;">
+            Confianza: ${data.confidence}%
+          </div>
+          ${data.total_detections ? `<div style="font-size:10px;color:#666;margin-top:4px;">
+            Total: ${data.total_detections} | Confirmados: ${data.confirmed_count}
+          </div>` : ''}
+        </div>
+        <div style="margin-left:15px;">
+          <div style="width:60px;height:60px;border-radius:50%;background:#E53935;display:flex;align-items:center;justify-content:center;font-size:24px;animation:pulse 1s infinite;">⚠️</div>
+        </div>
+      </div>
+    `;
+    
+    feed.insertBefore(item, feed.firstChild);
+    
+    while (feed.children.length > 20) {
+      feed.removeChild(feed.lastChild);
+    }
+  }
+
+  function playAlertSound() {
+    try {
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      oscillator.frequency.value = 800;
+      oscillator.type = 'sine';
+      
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+      
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.5);
+    } catch (e) {
+      console.warn('No se pudo reproducir sonido:', e);
+    }
+  }
+
+  function showDesktopNotification(data) {
+    if ("Notification" in window && Notification.permission === "granted") {
+      new Notification("🚨 ACCIDENTE DETECTADO", {
+        body: `Cámara ${data.camera_ip}\nConfianza: ${data.confidence}%\nHora: ${new Date(data.timestamp).toLocaleTimeString()}`,
+        tag: `accident-${data.camera_id}`,
+        requireInteraction: true
+      });
+    }
+  }
+
+  function updateGlobalStats() {
+    let totalDetections = 0;
+    let totalConfirmed = 0;
+    
+    const promises = cameras.map(cam => {
+      if (cam.is_streaming) {
+        return loadCameraStats(cam.id).then(stats => {
+          if (stats) {
+            totalDetections += stats.total_detections;
+            totalConfirmed += stats.confirmed_accidents;
+          }
+        });
+      }
+      return Promise.resolve();
+    });
+    
+    Promise.all(promises).then(() => {
+      const totalEl = document.getElementById('global-total-detections');
+      const confirmedEl = document.getElementById('global-confirmed-accidents');
+      
+      if (totalEl) totalEl.innerText = totalDetections;
+      if (confirmedEl) confirmedEl.innerText = totalConfirmed;
+    });
+  }
+
+  async function loadCameraStats(cameraId) {
+    try {
+      const response = await fetch(`${API_URL}/cameras/${cameraId}/stats`);
+      const data = await response.json();
+      
+      if (data.success) {
+        return data.stats;
+      }
+    } catch (error) {
+      console.error('Error cargando estadísticas:', error);
+    }
+    return null;
+  }
+
+  // Actualizar estadísticas cada 5 segundos
+  setInterval(updateGlobalStats, 5000);
+
+  // Solicitar permiso para notificaciones
+  window.addEventListener('load', () => {
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
   });
 
-
-
+  function updateChartsWithNewDetection(data) {
+    // Placeholder para actualizar gráficas en tiempo real
+    console.log('Actualizando gráficas con nueva detección:', data);
+  }
 
   // ============================================
 // RECEPCIÓN DE FRAMES DE CÁMARA
@@ -569,29 +870,56 @@
   // 2️⃣ Actualizar "Monitoreo DVR"
   const dvrImg = document.getElementById('dvr-stream-' + cameraId);
   const waiting = document.getElementById('dvr-waiting-' + cameraId);
+  const statsDiv = document.getElementById('dvr-stats-' + cameraId);
 
   if (dvrImg) {
     dvrImg.src = frameData;
     dvrImg.style.display = 'block';
     
     if (waiting) waiting.style.display = 'none';
+    
+    if (data.yolo_active && statsDiv) {
+      statsDiv.style.display = 'block';
+    }
     console.log('✅ DVR actualizado para cámara', cameraId);
   } else {
     console.warn('⚠️ DVR img no encontrada para cámara', cameraId);
   }
   
-  // 3️⃣ Marcar borde rojo si está grabando
+  // 3️⃣ Actualizar indicadores en DVR
   const cell = document.querySelector('.dvr-cell[data-camera-id="' + cameraId + '"]');
   if (cell) {
-    if (data.is_recording) {
-      cell.style.borderColor = '#E53935';
+    if (data.consecutive_detections > 0) {
+      cell.dataset.detecting = 'true';
+      cell.style.borderColor = '#FF9800';
       cell.style.borderWidth = '4px';
-      cell.style.boxShadow = '0 0 20px rgba(229, 57, 53, 0.5)';
+      cell.style.boxShadow = '0 0 20px rgba(255, 152, 0, 0.6)';
+      
+      const detectingOverlay = document.getElementById(`dvr-detecting-${cameraId}`);
+      if (detectingOverlay) {
+        detectingOverlay.style.display = 'block';
+        detectingOverlay.innerHTML = `
+          ⚠️ VERIFICANDO ACCIDENTE<br>
+          <small style="font-size:11px;font-weight:normal;">
+            ${data.consecutive_detections}/${data.detection_progress || 25} frames
+          </small>
+        `;
+      }
     } else {
-      // Restaurar estilo
-      cell.style.borderColor = '';
-      cell.style.borderWidth = '';
+      cell.dataset.detecting = 'false';
+      cell.style.borderColor = data.yolo_active ? '#4CAF50' : '#444';
+      cell.style.borderWidth = '2px';
       cell.style.boxShadow = '';
+      
+      const detectingOverlay = document.getElementById(`dvr-detecting-${cameraId}`);
+      if (detectingOverlay) {
+        detectingOverlay.style.display = 'none';
+      }
+    }
+    
+    const consecutiveSpan = document.getElementById(`dvr-consecutive-${cameraId}`);
+    if (consecutiveSpan) {
+      consecutiveSpan.innerText = data.consecutive_detections || 0;
     }
   }
 });
@@ -671,7 +999,10 @@
         if (map) map.invalidateSize();
       }, 100);
     }
-    if (pageId === 'monitoreo') initDVR();
+    if (pageId === 'monitoreo') {
+      initDVR();
+      setTimeout(() => updateGlobalStats(), 500);
+    }
     if (pageId === 'registros') loadAccidents();
     if (pageId === 'estadisticas') initCharts();
     if (pageId === 'dashboard') updateDashboard();
@@ -905,17 +1236,23 @@ function showAllCameras() {
       let previewContent = `<div style="font-size:48px;">📹</div>`;
       
       if (cam.is_streaming) {
-        previewContent = `<img id="cam-preview-${cam.id}" style="width:100%;height:100%;object-fit:cover;" alt="Stream en vivo">`;
+        previewContent = `
+          <img id="cam-preview-${cam.id}" style="width:100%;height:100%;object-fit:cover;" alt="Stream en vivo">
+          <div style="position:absolute;top:10px;right:10px;background:rgba(76,175,80,0.9);padding:4px 8px;border-radius:4px;font-size:10px;font-weight:bold;">
+            🎯 YOLO ACTIVO
+          </div>
+        `;
       }
       
       card.innerHTML = `
-        <div class="camera-preview">${previewContent}</div>
+        <div class="camera-preview" style="position:relative;">${previewContent}</div>
         <div style="margin-bottom:8px;"><b>Cámara ${cam.id}</b></div>
         <div style="font-size:12px;color:#999;margin-bottom:4px;">IP: ${cam.ip}:${cam.puerto}</div>
         <div style="font-size:12px;color:#999;margin-bottom:4px;">📍 ${cam.latitud != null ? parseFloat(cam.latitud).toFixed(6) : 'N/A'}, ${cam.longitud != null ? parseFloat(cam.longitud).toFixed(6) : 'N/A'}</div>
         <div style="font-size:12px;margin-bottom:10px;">
           <span style="color:${cam.is_streaming ? '#4CAF50' : '#999'};">● ${cam.is_streaming ? 'Transmitiendo' : 'Detenida'}</span>
         </div>
+        <div id="cam-stats-${cam.id}" style="font-size:10px;color:#666;margin-bottom:8px;min-height:20px;"></div>
         <button class="btn ${cam.is_streaming ? 'btn-danger' : 'btn-success'}" 
                 onclick="${cam.is_streaming ? 'stopCameraStream' : 'startCameraStream'}(${cam.id})" 
                 style="font-size:12px;padding:6px 12px;margin-right:5px;">
@@ -924,6 +1261,20 @@ function showAllCameras() {
         <button class="btn btn-danger" onclick="deleteCamera(${cam.id})" style="font-size:12px;padding:6px 12px;">🗑️ Eliminar</button>
       `;
       list.appendChild(card);
+      
+      if (cam.is_streaming) {
+        loadCameraStats(cam.id).then(stats => {
+          if (stats) {
+            const statsDiv = document.getElementById(`cam-stats-${cam.id}`);
+            if (statsDiv) {
+              statsDiv.innerHTML = `
+                📊 Detecciones: ${stats.total_detections} | 
+                ✅ Confirmados: ${stats.confirmed_accidents}
+              `;
+            }
+          }
+        });
+      }
     });
     
     updateCameraCount();
@@ -962,19 +1313,40 @@ function showAllCameras() {
     
       if (i < cameras.length) {
         const cam = cameras[i];
+        
+        if (cam.is_streaming) {
+          cell.dataset.yoloActive = 'true';
+        }
       
-      // ===== AGREGAR DOBLE CLICK PARA PANTALLA COMPLETA =====
         cell.addEventListener('dblclick', function() {
           toggleFullscreen(this);
         });
       
         cell.innerHTML = `
-          <div class="dvr-label">Cámara ${cam.id} - ${cam.ip}</div>
+          <div class="dvr-label" style="background:rgba(0,0,0,0.8);padding:8px 12px;border-radius:6px;">
+            Cámara ${cam.id} - ${cam.ip}
+            ${cam.is_streaming ? '<span style="color:#4CAF50;margin-left:8px;">🎯 YOLO</span>' : ''}
+          </div>
           <img id="dvr-stream-${cam.id}" style="width:100%;height:100%;object-fit:cover;display:none;" alt="Stream">
-          <div id="dvr-waiting-${cam.id}" style="color:#999;padding:20px;">Esperando stream...</div>
+          <div id="dvr-waiting-${cam.id}" style="color:#999;padding:20px;text-align:center;">
+            Esperando stream...
+            ${cam.is_streaming ? '<br><small style="color:#4CAF50;">Conectando...</small>' : ''}
+          </div>
+          
+          <div id="dvr-stats-${cam.id}" style="position:absolute;bottom:50px;left:10px;background:rgba(0,0,0,0.85);padding:8px 12px;border-radius:6px;font-size:11px;display:none;z-index:20;">
+            <div style="color:#4CAF50;font-weight:bold;">📊 Estadísticas YOLO</div>
+            <div style="color:#ccc;margin-top:4px;">Detecciones: <span id="dvr-detections-${cam.id}">0</span></div>
+            <div style="color:#ccc;">Confirmados: <span id="dvr-confirmed-${cam.id}">0</span></div>
+            <div style="color:#FF9800;margin-top:4px;">Consecutivos: <span id="dvr-consecutive-${cam.id}">0</span>/<span id="dvr-required-${cam.id}">25</span></div>
+          </div>
+          
+          <div id="dvr-detecting-${cam.id}" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(255,152,0,0.95);padding:15px 25px;border-radius:10px;font-size:14px;font-weight:bold;display:none;z-index:30;animation:pulse 1s infinite;">
+            ⚠️ VERIFICANDO ACCIDENTE
+          </div>
+          
           <div style="position:absolute;bottom:10px;left:10px;z-index:10;">
-            <button class="btn btn-success" onclick="startCameraStream(${cam.id}); event.stopPropagation();" style="font-size:10px;padding:4px 8px;">▶️ Iniciar</button>
-            <button class="btn btn-danger" onclick="stopCameraStream(${cam.id}); event.stopPropagation();" style="font-size:10px;padding:4px 8px;">⏹️ Detener</button>
+            <button class="btn btn-success" onclick="startCameraStream(${cam.id}); event.stopPropagation();" style="font-size:10px;padding:4px 8px;">▶️</button>
+            <button class="btn btn-danger" onclick="stopCameraStream(${cam.id}); event.stopPropagation();" style="font-size:10px;padding:4px 8px;">⏹️</button>
           </div>
         `;
       } else {
@@ -983,8 +1355,9 @@ function showAllCameras() {
     
       grid.appendChild(cell);
     }
+    
+    startDVRStatsUpdate();
   }
-  
 
   async function startCameraStream(cameraId) {
     try {
@@ -1022,57 +1395,20 @@ function showAllCameras() {
     }
   }
 
-// ============================================
-// ACTUALIZAR FRAME DE CÁMARA
-// ============================================
-function updateCameraFrame(cameraId, frameBase64, isRecording) {
-  if (!frameBase64 || frameBase64.length < 50) {
-    console.warn(`⚠️ Frame vacío para cámara ${cameraId}`);
-    return;
-  }
-
-  const safeFrame = `data:image/jpeg;base64,${frameBase64.trim()}`;
-
-  // DVR principal
-  const dvrImg = document.querySelector(`.dvr-cell[data-camera-id="${cameraId}"] img`);
-  if (dvrImg) {
-    dvrImg.src = safeFrame;
-    dvrImg.style.display = 'block';
-  }
-
-  // En la vista de lista de cámaras
-  const preview = document.getElementById(`cam-preview-${cameraId}`);
-  if (preview) {
-    preview.src = safeFrame;
-  }
-}
-
-
-  // ============================================
-// PANTALLA COMPLETA
-// ============================================
-
   let fullscreenCell = null;
 
   function toggleFullscreen(cell) {
-  // Si ya hay una celda en pantalla completa
     if (fullscreenCell) {
-    // Salir de pantalla completa
       fullscreenCell.classList.remove('fullscreen');
       fullscreenCell = null;
-    
-    // Re-renderizar el grid para restaurar todo
       setTimeout(() => renderDVRGrid(), 100);
-    
       showToast('Saliendo de pantalla completa', 'info');
       return;
     }
   
-  // Entrar a pantalla completa
     cell.classList.add('fullscreen');
     fullscreenCell = cell;
   
-  // Ocultar botones en pantalla completa
     const buttons = cell.querySelector('[style*="position:absolute"]');
     if (buttons) {
       buttons.style.display = 'none';
@@ -1080,7 +1416,6 @@ function updateCameraFrame(cameraId, frameBase64, isRecording) {
   
     showToast('Doble click nuevamente o presiona ESC para salir', 'info');
   
-  // Agregar listener para ESC
     const escapeHandler = (e) => {
       if (e.key === 'Escape' && fullscreenCell) {
         toggleFullscreen(fullscreenCell);
@@ -1089,125 +1424,124 @@ function updateCameraFrame(cameraId, frameBase64, isRecording) {
     };
   
     document.addEventListener('keydown', escapeHandler);
-  }  
-    // Actualizar en DVR
-    const cells = document.querySelectorAll('.dvr-cell');
-    cells.forEach(cell => {
-      if (cell.dataset.cameraId == cameraId) {
-        let img = cell.querySelector('img');
-        if (!img) {
-          cell.innerHTML = '';
-          img = document.createElement('img');
-          img.style.width = '100%';
-          img.style.height = '100%';
-          img.style.objectFit = 'cover';
-          cell.appendChild(img);
-          
-          const label = document.createElement('div');
-          label.className = 'dvr-label';
-          label.innerText = `Cámara ${cameraId}`;
-          cell.appendChild(label);
-        }
-        
-        img.src = 'data:image/jpeg;base64,' + frameBase64;
-        
-        if (isRecording) {
-          cell.style.borderColor = '#E53935';
-          cell.style.borderWidth = '3px';
-        } else {
-          cell.style.borderColor = '#444';
-          cell.style.borderWidth = '2px';
-        }
-      }
-    });
-
-
-  function addDetectionToFeed(data) {
-    const feed = document.getElementById('detection-feed');
-    
-    // Limpiar mensaje de "Esperando"
-    if (feed.querySelector('[style*="text-align:center"]')) {
-      feed.innerHTML = '';
-    }
-    
-    const item = document.createElement('div');
-    item.className = 'detection-item';
-    item.innerHTML = `
-      <div>
-        <div style="font-weight:bold;">🚨 ACCIDENTE SEVERE</div>
-        <div style="font-size:11px;color:#999;">Cámara ${data.camera_ip} - ${new Date(data.timestamp).toLocaleTimeString()}</div>
-        <div style="font-size:11px;color:#4CAF50;">Confianza: ${data.confidence}%</div>
-      </div>
-      <div style="color:#E53935;">⚠️</div>
-    `;
-    
-    feed.insertBefore(item, feed.firstChild);
-    
-    if (feed.children.length > 10) {
-      feed.removeChild(feed.lastChild);
-    }
   }
 
-  // ============================================
-  // REGISTROS
-  // ============================================
+  let dvrStatsInterval = null;
 
-  function renderRegistros() {
-    const table = document.getElementById('registrosTable');
-    table.innerHTML = '';
-    
-    if (accidents.length === 0) {
-      table.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#999;">No hay registros de accidentes</td></tr>';
-      return;
+  function startDVRStatsUpdate() {
+    if (dvrStatsInterval) {
+      clearInterval(dvrStatsInterval);
     }
     
-    accidents.forEach(acc => {
-      const fecha = new Date(acc.fecha_accidente);
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${acc.id}</td>
-        <td>${fecha.toLocaleDateString()}</td>
-        <td>${fecha.toLocaleTimeString()}</td>
-        <td>${acc.ruta_archivo || 'N/A'}</td>
-        <td>${acc.camera_ip || 'Cámara ' + acc.id_camara}</td>
-        <td>${acc.latitud}, ${acc.longitud}</td>
-        <td>
-          <button class="btn btn-primary" onclick="viewAccident(${acc.id})" style="font-size:11px;padding:4px 8px;">👁️ Ver</button>
+    dvrStatsInterval = setInterval(() => {
+      cameras.forEach(cam => {
+        if (cam.is_streaming) {
+          loadCameraStats(cam.id).then(stats => {
+            if (stats) {
+              const detectionsSpan = document.getElementById(`dvr-detections-${cam.id}`);
+              const confirmedSpan = document.getElementById(`dvr-confirmed-${cam.id}`);
+              
+              if (detectionsSpan) detectionsSpan.innerText = stats.total_detections;
+              if (confirmedSpan) confirmedSpan.innerText = stats.confirmed_accidents;
+            }
+          });
+        }
+      });
+    }, 3000);
+  }
+
+// ============================================
+// REGISTROS
+// ============================================
+
+function renderRegistros() {
+  const table = document.getElementById('registrosTable');
+  table.innerHTML = '';
+
+  if (accidents.length === 0) {
+    table.innerHTML = `
+      <tr>
+        <td colspan="7" style="text-align:center;color:#999;">
+          No hay registros de accidentes
         </td>
-      `;
-      table.appendChild(tr);
-    });
-    
-    document.getElementById("dash-accidents").innerText = accidents.length;
+      </tr>`;
+    return;
   }
 
-  function viewAccident(id) {
-    const acc = accidents.find(a => a.id === id);
-    if (!acc) return;
-    
+  accidents.forEach(acc => {
     const fecha = new Date(acc.fecha_accidente);
-    alert(`ACCIDENTE #${acc.id}\n\nFecha: ${fecha.toLocaleString()}\nCámara: ${acc.camera_ip || 'ID ' + acc.id_camara}\nUbicación: ${acc.latitud}, ${acc.longitud}\nDescripción: ${acc.descripcion || 'N/A'}\nArchivo: ${acc.ruta_archivo || 'N/A'}`);
-  }
 
-  async function exportToCSV() {
-    try {
-      const response = await fetch(`${API_URL}/accidents/export`);
+// Sumar 5 horas (5 * 60 * 60 * 1000 ms)
+    const fechaAjustada = new Date(fecha.getTime() + (5 * 60 * 60 * 1000));
+
+    const fechaLocal = fechaAjustada.toLocaleDateString('es-CO', { timeZone: 'America/Bogota' });
+    const horaLocal  = fechaAjustada.toLocaleTimeString('es-CO', { timeZone: 'America/Bogota' });
+
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${acc.id}</td>
+      <td>${fechaLocal}</td>
+      <td>${horaLocal}</td>
+      <td>${acc.ruta_archivo || 'N/A'}</td>
+      <td>${acc.camera_ip || 'Cámara ' + acc.id_camara}</td>
+      <td>${acc.latitud}, ${acc.longitud}</td>
+      <td>
+        <button class="btn btn-primary" onclick="viewAccident(${acc.id})"
+                style="font-size:11px;padding:4px 8px;">👁️ Ver</button>
+      </td>
+    `;
+    table.appendChild(tr);
+  });
+
+  document.getElementById("dash-accidents").innerText = accidents.length;
+}
+
+function viewAccident(id) {
+  const acc = accidents.find(a => a.id === id);
+  if (!acc) return;
+
+  const fecha = new Date(acc.fecha_accidente);
+
+  // Ajuste a zona horaria de Colombia (UTC-5)
+  const fechaLocal = fecha.toLocaleDateString('es-CO', {
+    timeZone: 'America/Bogota'
+  });
+  const horaLocal = fecha.toLocaleTimeString('es-CO', {
+    timeZone: 'America/Bogota'
+  });
+
+  alert(
+    `ACCIDENTE #${acc.id}\n\n` +
+    `Fecha: ${fechaLocal}\n` +
+    `Hora: ${horaLocal}\n` +
+    `Cámara: ${acc.camera_ip || 'ID ' + acc.id_camara}\n` +
+    `Ubicación: ${acc.latitud}, ${acc.longitud}\n` +
+    `Descripción: ${acc.descripcion || 'N/A'}\n` +
+    `Archivo: ${acc.ruta_archivo || 'N/A'}`
+  );
+}
+
+async function exportToCSV() {
+  try {
+    const response = await fetch(`${API_URL}/accidents/export`);
+    
+    if (response.ok) {
+      const csv = await response.text();
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `accidentes_${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
       
-      if (response.ok) {
-        const csv = await response.text();
-        const blob = new Blob([csv], { type: 'text/csv' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `accidentes_${new Date().toISOString().split('T')[0]}.csv`;
-        a.click();
-        
-        showToast('CSV exportado correctamente', 'success');
-      }
-    } catch (error) {
-      showToast('Error exportando CSV', 'error');
+      showToast('CSV exportado correctamente', 'success');
     }
+  } catch (error) {
+    showToast('Error exportando CSV', 'error');
   }
+}
+
 
   // ============================================
   // SUBIR VIDEO
@@ -1299,7 +1633,6 @@ function displayAnalysisResults() {
       const item = document.createElement('div');
       item.className = 'detection-result';
       
-      // Mostrar frame si está disponible
       let framePreview = '';
       if (det.frame_path) {
         const frameName = det.frame_path.split(/[\\/]/).pop();
@@ -1318,7 +1651,6 @@ function displayAnalysisResults() {
       list.appendChild(item);
     });
     
-    // Agregar botón para descargar video anotado
     if (window.currentAnnotatedVideoPath) {
       const downloadBtn = document.createElement('button');
       downloadBtn.className = 'btn btn-success';
@@ -1361,6 +1693,11 @@ async function downloadAnnotatedVideo() {
     showToast('Error descargando video', 'error');
   }
 }
+
+  function downloadResults() {
+    downloadAnnotatedVideo();
+  }
+
   // ============================================
   // ESTADÍSTICAS
   // ============================================
@@ -1575,6 +1912,41 @@ async function downloadAnnotatedVideo() {
     }
   }
 
+// ✅ ACTUALIZAR CONFIGURACIÓN DINÁMICA DESDE EL BACKEND
+async function updateSystemConfig() {
+  try {
+    // Obtener configuración de la primera cámara activa
+    const activeCamera = cameras.find(c => c.is_streaming);
+    if (!activeCamera) return;
+    
+    const response = await fetch(`${API_URL}/cameras/${activeCamera.id}/stats`);
+    const data = await response.json();
+    
+    if (data.success && data.stats) {
+      const requiredFrames = data.stats.required_frames || 25;
+      const cooldown = data.stats.cooldown_seconds || 30;
+      
+      // Actualizar panel de configuración
+      const requiredEl = document.getElementById('config-required-frames');
+      const cooldownEl = document.getElementById('config-cooldown-seconds');
+      
+      if (requiredEl) requiredEl.innerText = `${requiredFrames} consecutivos`;
+      if (cooldownEl) cooldownEl.innerText = `${cooldown} segundos`;
+      
+      // Actualizar todos los DVR que muestren el valor requerido
+      cameras.forEach(cam => {
+        const reqSpan = document.getElementById(`dvr-required-${cam.id}`);
+        if (reqSpan) reqSpan.innerText = requiredFrames;
+      });
+    }
+  } catch (error) {
+    console.error('Error actualizando configuración:', error);
+  }
+}
+
+// Actualizar cada 10 segundos
+setInterval(updateSystemConfig, 10000);
+
   // ============================================
   // CONFIGURACIÓN
   // ============================================
@@ -1593,11 +1965,6 @@ async function downloadAnnotatedVideo() {
     info.style.display = isActive ? 'none' : 'block';
     showToast(isActive ? 'Mapa de calor desactivado' : 'Mapa de calor activado', 'info');
     }
-
-  function showAllCameras() {
-    const cams = cameras.length;
-    showToast(`${cams} cámaras en el sistema`, 'info');
-  }
 
   function generateReport() {
     showToast('Generando reporte...', 'info');
@@ -1639,10 +2006,20 @@ async function downloadAnnotatedVideo() {
   // INICIALIZACIÓN
   // ============================================
 
-  window.onload = function() {
-    console.log('Iniciando aplicación...');
-    showToast('Conectando con el backend...', 'info');
-  };
+window.onload = function() {
+  console.log('%c🎯 SISTEMA DE DETECCIÓN YOLO INICIADO', 'color: #4CAF50; font-size: 16px; font-weight: bold;');
+  console.log('%cCaracterísticas:', 'color: #999; font-size: 12px;');
+  console.log('%c  ✓ Detección en tiempo real', 'color: #4CAF50; font-size: 12px;');
+  console.log('%c  ✓ Verificación anti falsos positivos (25 frames)', 'color: #4CAF50; font-size: 12px;');
+  console.log('%c  ✓ Cooldown de 30 segundos entre confirmaciones', 'color: #4CAF50; font-size: 12px;');
+  console.log('%c  ✓ Notificaciones de escritorio', 'color: #4CAF50; font-size: 12px;');
+  console.log('%c  ✓ Overlay de estadísticas en DVR', 'color: #4CAF50; font-size: 12px;');
+  showToast('Conectando con el backend...', 'info');
+  
+  // ✅ AGREGAR ESTA LÍNEA
+  setTimeout(updateSystemConfig, 2000); // Actualizar config después de 2 segundos
+};
+
 </script>
 </body>
 </html>

@@ -11,6 +11,7 @@ from database import db
 from services.camera_service import CameraManager
 from services.video_service import VideoService
 
+
 FRONTEND_DIR = r"C:\Users\Ramirez\Desktop\ACCIDENT\FRONTED"
 
 # Inicializar Flask
@@ -424,6 +425,31 @@ def health_check():
             'status': 'unhealthy',
             'error': str(e)
         }), 500
+
+
+@app.route('/api/cameras/<int:camera_id>/stats', methods=['GET'])
+def get_camera_stats(camera_id):
+    """Obtener estadísticas de detección de una cámara"""
+    try:
+        stats = camera_manager.get_camera_stats(camera_id)
+        
+        if stats is None:
+            return jsonify({
+                'success': False, 
+                'error': 'Cámara no está activa o no existe'
+            }), 404
+        
+        return jsonify({
+            'success': True,
+            'camera_id': camera_id,
+            'stats': stats,
+            'yolo_active': camera_manager.use_yolo
+        })
+    except Exception as e:
+        logger.error(f"Error obteniendo estadísticas: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+    
+
 
 # ============================================
 # MAIN
