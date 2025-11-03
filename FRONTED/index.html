@@ -323,7 +323,7 @@
                   <div style="font-size:12px;font-weight:bold;margin-bottom:10px;">⚙️ Configuración</div>
                   <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11px;">
                     <div style="color:#999;">Frames requeridos:</div>
-                    <div id="config-required-frames" style="color:#4CAF50;font-weight:bold;text-align:right;">25 consecutivos</div>
+                    <div id="config-required-frames" style="color:#4CAF50;font-weight:bold;text-align:right;">120 consecutivos</div>
                     <div style="color:#999;">Cooldown:</div>
                     <div id="config-cooldown-seconds" style="color:#FF9800;font-weight:bold;text-align:right;">30 segundos</div>
                     <div style="color:#999;">Confianza mínima:</div>
@@ -590,6 +590,7 @@
     reconnectionAttempts: 5,
     reconnectionDelay: 2000
   });
+
   socket.onAny((event, data) => {
     console.log('📨 Evento recibido:', event, data);
   });
@@ -677,7 +678,7 @@ function updateDetectionProgress(data) {
     feed.insertBefore(progressItem, feed.firstChild);
   }
   
-  // ✅ USAR VALORES DEL BACKEND (no hardcodear)
+  // ✅ USAR VALORES DEL BACKEND (120 frames = 4.8 segundos a 25 FPS)
   const progress = (data.consecutive_frames / data.required_frames) * 100;
   const progressColor = progress >= 100 ? '#4CAF50' : '#FF9800';
   
@@ -1461,7 +1462,7 @@ function renderRegistros() {
   if (accidents.length === 0) {
     table.innerHTML = `
       <tr>
-        <td colspan="7" style="text-align:center;color:#999;">
+        <td colspan="8" style="text-align:center;color:#999;">
           No hay registros de accidentes
         </td>
       </tr>`;
@@ -1470,25 +1471,23 @@ function renderRegistros() {
 
   accidents.forEach(acc => {
     const fecha = new Date(acc.fecha_accidente);
-
-// Sumar 5 horas (5 * 60 * 60 * 1000 ms)
     const fechaAjustada = new Date(fecha.getTime() + (5 * 60 * 60 * 1000));
-
     const fechaLocal = fechaAjustada.toLocaleDateString('es-CO', { timeZone: 'America/Bogota' });
-    const horaLocal  = fechaAjustada.toLocaleTimeString('es-CO', { timeZone: 'America/Bogota' });
-
+    const horaLocal = fechaAjustada.toLocaleTimeString('es-CO', { timeZone: 'America/Bogota' });
 
     const tr = document.createElement('tr');
+    const nombreVideo = acc.ruta_archivo ? acc.ruta_archivo.split('\\').pop() : 'N/A';
+    
     tr.innerHTML = `
       <td>${acc.id}</td>
       <td>${fechaLocal}</td>
       <td>${horaLocal}</td>
-      <td>${acc.ruta_archivo || 'N/A'}</td>
+      <td>${nombreVideo}</td>
       <td>${acc.camera_ip || 'Cámara ' + acc.id_camara}</td>
       <td>${acc.latitud}, ${acc.longitud}</td>
       <td>
-        <button class="btn btn-primary" onclick="viewAccident(${acc.id})"
-                style="font-size:11px;padding:4px 8px;">👁️ Ver</button>
+        <button class="btn btn-primary" onclick="viewAccident(${acc.id})" style="font-size:11px;padding:4px 8px;">👁️ Ver</button>
+        ${acc.ruta_archivo ? `<button class="btn btn-warning" onclick="playVideo('${nombreVideo}')" style="font-size:11px;padding:4px 8px;margin-left:4px;">▶️ Video</button>` : ''}
       </td>
     `;
     table.appendChild(tr);
@@ -1497,13 +1496,97 @@ function renderRegistros() {
   document.getElementById("dash-accidents").innerText = accidents.length;
 }
 
+function playVideo(filename) {
+  console.log('Intentando reproducir:', filename);
+  
+  const modal = document.createElement('div');
+  modal.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.95);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+  `;
+
+  const videoContainer = document.createElement('div');
+  videoContainer.style.cssText = `
+    position: relative;
+    max-width: 90%;
+    max-height: 90%;
+    background: #000;
+    border-radius: 8px;
+    overflow: hidden;
+  `;
+
+  const closeBtn = document.createElement('button');
+  closeBtn.innerHTML = '×';
+  closeBtn.style.cssText = `
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(0, 0, 0, 0.7);
+    border: none;
+    color: white;
+    font-size: 28px;
+    cursor: pointer;
+    width: 40px;
+    height: 40px;
+    border-radius: 4px;
+    z-index: 2001;
+  `;
+  closeBtn.onclick = () => modal.remove();
+
+  const video = document.createElement('video');
+  video.style.cssText = `
+    width: 100%;
+    max-width: 900px;
+    max-height: 80vh;
+    display: block;
+  `;
+  video.controls = true;
+  video.autoplay = false; // No autoplay para evitar errores
+  
+  // Construir URL correctamente
+  const videoUrl = `https://accident-detector.site/videos/${encodeURIComponent(filename)}`;
+  console.log('URL del video:', videoUrl);
+  
+  video.src = videoUrl;
+  
+  // Log de eventos del video
+  video.addEventListener('loadstart', () => console.log('Video: loadstart'));
+  video.addEventListener('loadedmetadata', () => console.log('Video: loadedmetadata'));
+  video.addEventListener('canplay', () => {
+    console.log('Video: canplay');
+    showToast('Video listo para reproducir', 'success');
+  });
+  video.addEventListener('error', (e) => {
+    console.error('Video error:', e);
+    showToast('Error al cargar video', 'error');
+  });
+
+  videoContainer.appendChild(closeBtn);
+  videoContainer.appendChild(video);
+  modal.appendChild(videoContainer);
+
+  modal.onclick = (e) => {
+    if (e.target === modal) modal.remove();
+  };
+
+  document.body.appendChild(modal);
+  showToast('Cargando video...', 'info');
+}
+
+
 function viewAccident(id) {
   const acc = accidents.find(a => a.id === id);
   if (!acc) return;
 
   const fecha = new Date(acc.fecha_accidente);
-
-  // Ajuste a zona horaria de Colombia (UTC-5)
   const fechaLocal = fecha.toLocaleDateString('es-CO', {
     timeZone: 'America/Bogota'
   });
@@ -1511,15 +1594,23 @@ function viewAccident(id) {
     timeZone: 'America/Bogota'
   });
 
-  alert(
-    `ACCIDENTE #${acc.id}\n\n` +
-    `Fecha: ${fechaLocal}\n` +
-    `Hora: ${horaLocal}\n` +
-    `Cámara: ${acc.camera_ip || 'ID ' + acc.id_camara}\n` +
-    `Ubicación: ${acc.latitud}, ${acc.longitud}\n` +
-    `Descripción: ${acc.descripcion || 'N/A'}\n` +
-    `Archivo: ${acc.ruta_archivo || 'N/A'}`
-  );
+  let mensaje = `
+ACCIDENTE #${acc.id}
+
+Fecha: ${fechaLocal}
+Hora: ${horaLocal}
+Cámara: ${acc.camera_ip || 'ID ' + acc.id_camara}
+Ubicación: ${acc.latitud}, ${acc.longitud}
+Descripción: ${acc.descripcion || 'N/A'}
+Archivo: ${acc.ruta_archivo ? acc.ruta_archivo.split('\\').pop() : 'N/A'}`;
+
+  alert(mensaje);
+
+  if (acc.ruta_archivo) {
+    if (confirm('¿Deseas reproducir el video del accidente?')) {
+      playVideo(acc.ruta_archivo.split('\\').pop());
+    }
+  }
 }
 
 async function exportToCSV() {

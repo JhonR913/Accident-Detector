@@ -5,7 +5,7 @@ import logging
 import os
 import cv2
 from datetime import datetime
-
+from flask import Flask, request, jsonify, send_file, send_from_directory, Response, make_response
 from config import Config
 from database import db
 from services.camera_service import CameraManager
@@ -449,8 +449,58 @@ def get_camera_stats(camera_id):
         logger.error(f"Error obteniendo estadísticas: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
     
-
-
+# ============================================
+# ENDPOINTS - SERVIR VIDEOS GUARDADOS
+# ============================================
+@app.route('/videos/<filename>', methods=['GET', 'OPTIONS'])
+def serve_video(filename):
+    """Servir videos de accidentes guardados"""
+    
+    # Manejar preflight CORS
+    if request.method == 'OPTIONS':
+        response = make_response()
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, HEAD, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Range'
+        return response, 200
+    
+    try:
+        videos_dir = r"C:\Users\Ramirez\Desktop\ACCIDENT\BACKEND\clips"
+        
+        # Sanitizar nombre
+        filename = filename.replace('..', '').replace('/', '\\')
+        file_path = os.path.join(videos_dir, filename)
+        
+        logger.info(f"Buscando video: {file_path}")
+        
+        # Validar existencia
+        if not os.path.exists(file_path):
+            logger.error(f"Video no encontrado: {file_path}")
+            return jsonify({'error': 'Video no encontrado'}), 404
+        
+        file_size = os.path.getsize(file_path)
+        logger.info(f"Video encontrado: {filename} ({file_size} bytes)")
+        
+        # Leer y servir archivo
+        with open(file_path, 'rb') as f:
+            video_data = f.read()
+        
+        response = make_response(video_data)
+        response.headers['Content-Type'] = 'video/mp4'
+        response.headers['Content-Length'] = str(file_size)
+        response.headers['Content-Disposition'] = f'inline; filename="{filename}"'
+        response.headers['Cache-Control'] = 'public, max-age=3600'
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Accept-Ranges'] = 'bytes'
+        
+        logger.info(f"Sirviendo video: {filename}")
+        return response
+    
+    except Exception as e:
+        logger.error(f"Error sirviendo video: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
 # ============================================
 # MAIN
 # ============================================

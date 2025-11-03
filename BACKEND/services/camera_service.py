@@ -46,9 +46,9 @@ class CameraStream:
         
         # 🎯 SISTEMA DE VERIFICACIÓN ROBUSTO
         self.consecutive_detections = 0
-        self.required_consecutive = 25  # ✅ 25 frames = ~1 segundo (confirmación sólida)
+        self.required_consecutive = 120  # ✅ 25 frames = ~1 segundo (confirmación sólida)
         self.last_confirmed_time = 0
-        self.cooldown_seconds = 30  # ✅ 30 segundos entre confirmaciones
+        self.cooldown_seconds = 60  # ✅ 30 segundos entre confirmaciones
         
         # 📊 Estadísticas
         self.total_detections = 0
