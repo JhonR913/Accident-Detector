@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - Sistema de Detección</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #1E1E1E 0%, #2D2D30 100%);
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #E0E0E0;
+    }
+
+    .login-container {
+      background: #252526;
+      border: 1px solid #444;
+      border-radius: 12px;
+      padding: 40px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    }
+
+    .login-header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    .logo {
+      width: 80px;
+      height: 80px;
+      background: #E53935;
+      border: 3px solid #C62828;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+      font-size: 36px;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+
+    .login-title {
+      font-size: 24px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .login-subtitle {
+      font-size: 14px;
+      color: #999;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      color: #E0E0E0;
+    }
+
+    .form-input {
+      width: 100%;
+      padding: 12px 15px;
+      background: #3E3E42;
+      border: 1px solid #444;
+      color: #E0E0E0;
+      border-radius: 6px;
+      font-size: 14px;
+      transition: border-color 0.3s;
+    }
+
+    .form-input:focus {
+      outline: none;
+      border-color: #007ACC;
+      box-shadow: 0 0 0 3px rgba(0, 122, 204, 0.1);
+    }
+
+    .form-input::placeholder {
+      color: #666;
+    }
+
+    .btn-login {
+      width: 100%;
+      padding: 14px;
+      background: #007ACC;
+      border: none;
+      border-radius: 6px;
+      color: white;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      margin-top: 10px;
+    }
+
+    .btn-login:hover {
+      background: #005A9E;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 122, 204, 0.4);
+    }
+
+    .btn-login:active {
+      transform: translateY(0);
+    }
+
+    .btn-login:disabled {
+      background: #666;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .alert {
+      padding: 12px 15px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      display: none;
+    }
+
+    .alert.show {
+      display: block;
+      animation: slideDown 0.3s;
+    }
+
+    @keyframes slideDown {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .alert-error {
+      background: rgba(229, 57, 53, 0.2);
+      border: 1px solid #E53935;
+      color: #E53935;
+    }
+
+    .alert-success {
+      background: rgba(76, 175, 80, 0.2);
+      border: 1px solid #4CAF50;
+      color: #4CAF50;
+    }
+
+    .remember-me {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 15px;
+      font-size: 14px;
+      color: #999;
+    }
+
+    .remember-me input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+    }
+
+    .footer-text {
+      text-align: center;
+      margin-top: 25px;
+      font-size: 12px;
+      color: #666;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: white;
+      animation: spin 0.6s linear infinite;
+      margin-right: 8px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-header">
+      <div class="logo">🚨</div>
+      <div class="login-title">Sistema de Detección</div>
+      <div class="login-subtitle">Monitoreo Inteligente de Accidentes</div>
+    </div>
+
+    <div id="alertBox" class="alert"></div>
+
+    <form id="loginForm" onsubmit="handleLogin(event)">
+      <div class="form-group">
+        <label class="form-label">👤 Usuario o Correo</label>
+        <input 
+          type="text" 
+          id="username" 
+          class="form-input" 
+          placeholder="Ingrese su usuario o correo"
+          required
+          autocomplete="username"
+        >
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">🔒 Contraseña</label>
+        <input 
+          type="password" 
+          id="password" 
+          class="form-input" 
+          placeholder="••••••••"
+          required
+          autocomplete="current-password"
+        >
+      </div>
+
+      <div class="remember-me">
+        <input type="checkbox" id="rememberMe">
+        <label for="rememberMe">Recordar sesión</label>
+      </div>
+
+      <button type="submit" class="btn-login" id="loginBtn">
+        Iniciar Sesión
+      </button>
+    </form>
+
+    <div class="footer-text">
+      © 2025 Sistema de Detección de Accidentes
+    </div>
+  </div>
+
+  <script>
+    const API_URL = 'https://accident-detector.site/api';
+
+    // Verificar si ya hay sesión activa
+    window.onload = function() {
+      const session = getSession();
+      if (session) {
+        verifyAndRedirect(session.token);
+      }
+    };
+
+    async function verifyAndRedirect(token) {
+      try {
+        const response = await fetch(`${API_URL}/auth/verify`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          sessionStorage.setItem('permissions', JSON.stringify(data.permissions))
+          window.location.href = 'index.html';
+        } else {
+          // Token inválido, limpiar sesión
+          localStorage.removeItem('session');
+          sessionStorage.removeItem('session');
+        }
+      } catch (error) {
+        console.error('Error verificando token:', error);
+      }
+    }
+
+    async function handleLogin(event) {
+      event.preventDefault();
+      
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      const rememberMe = document.getElementById('rememberMe').checked;
+      
+      const loginBtn = document.getElementById('loginBtn');
+      loginBtn.disabled = true;
+      loginBtn.innerHTML = '<span class="spinner"></span>Iniciando sesión...';
+      
+      try {
+        const response = await fetch(`${API_URL}/auth/login`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ 
+            username: username,
+            password: password 
+          })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          // Guardar sesión completa con permisos
+          const session = {
+            token: data.token,
+            user_id: data.user.id,
+            nombre: data.user.nombre,
+            correo: data.user.correo,
+            rol: data.user.rol,
+            permissions: data.permissions,
+            timestamp: Date.now()
+          };
+          
+          if (rememberMe) {
+            localStorage.setItem('session', JSON.stringify(session));
+            sessionStorage.setItem('permissions', JSON.stringify(data.permissions));
+          } else {
+            sessionStorage.setItem('session', JSON.stringify(session));
+            sessionStorage.setItem('permissions', JSON.stringify(data.permissions))
+          }
+          
+          showAlert(`¡Bienvenido ${data.user.nombre}! Redirigiendo...`, 'success');
+          
+          setTimeout(() => {
+            window.location.href = 'index.html';
+          }, 1000);
+          
+        } else {
+          showAlert(data.error || 'Usuario o contraseña incorrectos', 'error');
+          loginBtn.disabled = false;
+          loginBtn.innerHTML = 'Iniciar Sesión';
+        }
+        
+      } catch (error) {
+        console.error('Error en login:', error);
+        showAlert('Error conectando con el servidor', 'error');
+        loginBtn.disabled = false;
+        loginBtn.innerHTML = 'Iniciar Sesión';
+      }
+    }
+
+    function showAlert(message, type) {
+      const alertBox = document.getElementById('alertBox');
+      alertBox.className = `alert alert-${type} show`;
+      alertBox.textContent = message;
+      
+      setTimeout(() => {
+        alertBox.classList.remove('show');
+      }, 5000);
+    }
+
+    function getSession() {
+      const localSession = localStorage.getItem('session');
+      const sessionSession = sessionStorage.getItem('session');
+      
+      if (localSession) return JSON.parse(localSession);
+      if (sessionSession) return JSON.parse(sessionSession);
+      
+      return null;
+    }
+
+    // Permitir Enter para enviar
+    document.getElementById('password').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        document.getElementById('loginForm').requestSubmit();
+      }
+    });
+  </script>
+</body>
+</html>

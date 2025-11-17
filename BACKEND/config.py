@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-
+from cryptography.fernet import Fernet
 load_dotenv()
 
 # Obtener directorio base del proyecto
@@ -38,6 +38,13 @@ class Config:
     # Video output
     VIDEO_CODEC = 'mp4v'
     VIDEO_EXTENSION = 'mp4'
+    FERNET_KEY = os.getenv("FERNET_KEY")
+
+    if not FERNET_KEY:
+        raise ValueError("❌ No se encontró FERNET_KEY en el archivo .env")
+
+    # Instancia Fernet para cifrado/descifrado
+    FERNET = Fernet(FERNET_KEY)
     
     @staticmethod
     def init_folders():

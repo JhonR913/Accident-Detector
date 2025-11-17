@@ -16,7 +16,9 @@
   
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  
+  <!-- Leaflet.heat Plugin -->
+  <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+
   <style>
     /* --- Estilos Generales --- */
     *{margin:0;padding:0;box-sizing:border-box;}
@@ -110,7 +112,7 @@
     /* Map Controls */
     .map-controls{display:flex;gap:10px;margin-bottom:15px;}
     .map-container{position:relative;}
-    .heatmap-overlay{position:absolute;top:15px;right:15px;background:rgba(0,0,0,0.8);padding:10px;border-radius:6px;font-size:12px;}
+    .heatmap-overlay{position:absolute;top:15px;right:15px;background:rgba(0,0,0,0.8);padding: 12px 15px;border-radius:8px;font-size:12px;font-weight: bold;color: #fff;border: 2px solid #E53935;box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);z-index: 1000;}
     
     /* Leaflet Map */
     #mapContainer{height:400px;border:1px solid #444;border-radius:8px;margin-top:10px;z-index:1;}
@@ -201,19 +203,22 @@
     <!-- Main -->
     <div class="main-content">
       <div class="sidebar">
-        <button class="menu-button active" onclick="showPage('dashboard')">📊 Dashboard</button>
-        <button class="menu-button" onclick="showPage('camaras')">📹 Cámaras</button>
-        <button class="menu-button" onclick="showPage('agregar')">➕ Agregar Cámara</button>
-        <button class="menu-button" onclick="showPage('monitoreo')">🔴 Monitoreo DVR</button>
-        <button class="menu-button" onclick="showPage('registros')">📋 Registros</button>
-        <button class="menu-button" onclick="showPage('subir')">📤 Subir Video</button>
-        <button class="menu-button" onclick="showPage('estadisticas')">📈 Estadísticas</button>
-        <button class="menu-button" onclick="showPage('mapa')">🗺️ Mapa</button>
-        <button class="menu-button" onclick="showPage('config')">⚙️ Configuración</button>
-        <button class="menu-button" onclick="showPage('usuarios')">👥 Usuarios</button>
-        <button class="menu-button" onclick="showPage('reportes')">📄 Reportes</button>
+        <button  id="btnDashboard" class="menu-button active" onclick="showPage('dashboard')">📊 Dashboard</button>
+        <button  id="btnCamaras" class="menu-button" onclick="showPage('camaras')">📹 Cámaras</button>
+        <button  id="btnAgregarCamara" class="menu-button" onclick="showPage('agregar')">➕ Agregar Cámara</button>
+        <button  id="btnMonitoreo" class="menu-button" onclick="showPage('monitoreo')">🔴 Monitoreo DVR</button>
+        <button  id="btnRegistros" class="menu-button" onclick="showPage('registros')">📋 Registros</button>
+        <button  id="btnSubirVideo" class="menu-button" onclick="showPage('subir')">📤 Subir Video</button>
+        <button  id="btnEstadisticas" class="menu-button" onclick="showPage('estadisticas')">📈 Estadísticas</button>
+        <button  id="btnMapa" class="menu-button" onclick="showPage('mapa')">🗺️ Mapa</button>
+        <button  id="btnConfiguracion" class="menu-button" onclick="showPage('config')">⚙️ Configuración</button>
+        <button  id="btnUsuarios" class="menu-button" onclick="showPage('usuarios')">👥 Usuarios</button>
+        <button  id="btnReportes" class="menu-button" onclick="showPage('reportes')">📄 Reportes</button>
         <button class="menu-button" onclick="logout()">🚪 Salir</button>
-        <div class="user-info"><div><b>👤 Administrador</b></div><div style="font-size:12px;color:#999;">Sesión activa</div></div>
+        <div class="user-info">
+           <div><b id="userNameLabel">👤 Administrador</b></div>
+           <div id="userRoleLabel" style="font-size:12px;color:#999;">Sesión activa</div>
+        </div>
       </div>
 
       <!-- Content -->
@@ -320,14 +325,14 @@
                 </div>
                 
                 <div style="flex:1;min-width:200px;background:rgba(255,255,255,0.03);padding:15px;border-radius:8px;border:1px solid #444;">
-                  <div style="font-size:12px;font-weight:bold;margin-bottom:10px;">⚙️ Configuración</div>
+                  <div style="font-size:12px;font-weight:bold;margin-bottom:10px;">⚙️ Configuración Activa</div>
                   <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11px;">
                     <div style="color:#999;">Frames requeridos:</div>
-                    <div id="config-required-frames" style="color:#4CAF50;font-weight:bold;text-align:right;">120 consecutivos</div>
+                    <div id="live-config-frames" style="color:#4CAF50;font-weight:bold;text-align:right;">120 consecutivos</div>
                     <div style="color:#999;">Cooldown:</div>
-                    <div id="config-cooldown-seconds" style="color:#FF9800;font-weight:bold;text-align:right;">30 segundos</div>
+                    <div id="live-config-cooldown" style="color:#FF9800;font-weight:bold;text-align:right;">60 segundos</div>
                     <div style="color:#999;">Confianza mínima:</div>
-                    <div style="color:#007ACC;font-weight:bold;text-align:right;">SEVERE</div>
+                    <div id="live-config-confidence" style="color:#007ACC;font-weight:bold;text-align:right;">75%</div>
                   </div>
                 </div>
                 
@@ -411,162 +416,321 @@
           </div>
         </div>
 
-        <!-- Estadísticas -->
+<!-- Estadísticas -->
         <div id="estadisticas" class="page">
+          <!-- Resumen General -->
           <div class="card">
-            <div class="card-title">Accidentes por Hora del Día</div>
+            <div class="card-title">📊 Resumen General del Sistema</div>
+            <div class="form-row" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+              <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #E53935 0%, #C62828 100%); border-radius: 10px;">
+                <div style="font-size: 48px; font-weight: bold; color: #FFF;" id="stat-total-accidents">0</div>
+                <div style="font-size: 14px; color: rgba(255,255,255,0.9); margin-top: 5px;">Total Accidentes</div>
+              </div>
+              <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #4CAF50 0%, #388E3C 100%); border-radius: 10px;">
+                <div style="font-size: 48px; font-weight: bold; color: #FFF;" id="stat-cameras-active">0</div>
+                <div style="font-size: 14px; color: rgba(255,255,255,0.9); margin-top: 5px;">Cámaras Activas</div>
+              </div>
+              <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #FF9800 0%, #F57C00 100%); border-radius: 10px;">
+                <div style="font-size: 48px; font-weight: bold; color: #FFF;" id="stat-last-24h">0</div>
+                <div style="font-size: 14px; color: rgba(255,255,255,0.9); margin-top: 5px;">Últimas 24 Horas</div>
+              </div>
+              <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%); border-radius: 10px;">
+                <div style="font-size: 48px; font-weight: bold; color: #FFF;" id="stat-avg-per-day">0</div>
+                <div style="font-size: 14px; color: rgba(255,255,255,0.9); margin-top: 5px;">Promedio Diario</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Accidentes por Hora -->
+          <div class="card">
+            <div class="card-title">⏰ Accidentes por Hora del Día</div>
             <canvas id="hourChart" height="80"></canvas>
           </div>
+
+          <!-- Severidad -->
           <div class="card">
-            <div class="card-title">Accidentes por Zona</div>
-            <canvas id="zoneChart" height="80"></canvas>
+            <div class="card-title">🚨 Distribución por Severidad</div>
+            <div class="form-row" style="gap: 20px;">
+              <div style="flex: 1; min-width: 300px;">
+                <canvas id="severityChart" height="200"></canvas>
+              </div>
+              <div style="flex: 1; min-width: 300px;">
+                <div id="severity-legend" style="display: flex; flex-direction: column; gap: 15px; padding: 20px;"></div>
+              </div>
+            </div>
           </div>
+
+          <!-- Top Cámaras -->
           <div class="card">
-            <div class="card-title">Accidentes por Cámara</div>
-            <canvas id="cameraChart" height="80"></canvas>
+            <div class="card-title">📹 Top 10 Cámaras</div>
+            <canvas id="cameraChart" height="100"></canvas>
+          </div>
+
+          <!-- Tendencia -->
+          <div class="card">
+            <div class="card-title">📈 Últimos 7 Días</div>
+            <canvas id="weeklyChart" height="80"></canvas>
           </div>
         </div>
 
-        <!-- Mapa -->
+<!-- Mapa -->
         <div id="mapa" class="page">
           <div class="card">
-            <div class="card-title">Mapa de Cámaras y Accidentes</div>
-            <div class="map-controls">
-              <button class="btn btn-primary" onclick="toggleHeatmap()">🔥 Activar Mapa de Calor</button>
+            <div class="card-title">🗺️ Mapa de Accidentes y Cámaras</div>
+            
+            <div class="map-controls" style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
+              <button class="btn btn-primary" onclick="toggleHeatmap1()">🔥 <span id="heatmap-btn-text">Activar Mapa de Calor</span></button>
               <button class="btn btn-primary" onclick="showAllCameras()">📹 Mostrar Cámaras</button>
+              <button class="btn btn-success" onclick="showAllAccidents()">🚨 Mostrar Accidentes</button>
+              <button class="btn btn-warning" onclick="filterBySeverity('CRÍTICA')">⚠️ Solo Críticos</button>
+              <button class="btn" style="background:#666;" onclick="clearMapMarkers()">🗑️ Limpiar</button>
             </div>
-            <div class="map-container">
-              <div id="mapContainerMapa" style="height: 500px; border-radius: 12px; overflow: hidden;"></div>
-              <div class="heatmap-overlay" id="heatmapInfo" style="display:none;">
-                🔥 Mapa de Calor Activo<br>
-                🔴 Alta concentración<br>
-                🟡 Media concentración<br>
-                🟢 Baja concentración
+            
+            <div style="background: #1E1E1E; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+              <div style="font-weight: bold; margin-bottom: 10px;">📊 Leyenda</div>
+              <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 8px;"><div style="width: 20px; height: 20px; background: #4CAF50; border-radius: 50%;"></div><span>BAJA</span></div>
+                <div style="display: flex; align-items: center; gap: 8px;"><div style="width: 20px; height: 20px; background: #FF9800; border-radius: 50%;"></div><span>MEDIA</span></div>
+                <div style="display: flex; align-items: center; gap: 8px;"><div style="width: 20px; height: 20px; background: #E53935; border-radius: 50%;"></div><span>ALTA</span></div>
+                <div style="display: flex; align-items: center; gap: 8px;"><div style="width: 20px; height: 20px; background: #B71C1C; border-radius: 50%; box-shadow: 0 0 10px #B71C1C;"></div><span>CRÍTICA</span></div>
+              </div>
+            </div>
+            
+            <div style="position: relative;">
+              <div id="mapContainerMapa" style="height: 600px; border-radius: 12px; overflow: hidden; border: 2px solid #444;"></div>
+              <div id="heatmapInfo" style="position: absolute; top: 15px; right: 15px; background: rgba(0,0,0,0.85); padding: 15px; border-radius: 8px; font-size: 12px; display: none; border: 1px solid #444;">
+                <div style="font-weight: bold; margin-bottom: 10px; color: #FF9800;">🔥 Mapa de Calor</div>
+                <div style="color: #E53935;">🔴 Alta</div>
+                <div style="color: #FF9800;">🟡 Media</div>
+                <div style="color: #4CAF50;">🟢 Baja</div>
+              </div>
+              <div style="position: absolute; bottom: 15px; left: 15px; background: rgba(0,0,0,0.85); padding: 15px; border-radius: 8px; font-size: 12px; border: 1px solid #444;">
+                <div style="font-weight: bold; margin-bottom: 8px;">📊 Stats</div>
+                <div>📹 Cámaras: <span id="map-stat-cameras" style="color: #2196F3; font-weight: bold;">0</span></div>
+                <div>🚨 Accidentes: <span id="map-stat-accidents" style="color: #E53935; font-weight: bold;">0</span></div>
+                <div>⚠️ Críticos: <span id="map-stat-critical" style="color: #B71C1C; font-weight: bold;">0</span></div>
               </div>
             </div>
           </div>
         </div>
+        <script src="https://cdn.jsdelivr.net/npm/leaflet.heat@0.2.0/dist/leaflet-heat.min.js"></script>
 
         <!-- Configuración -->
         <div id="config" class="page">
           <div class="form-container">
-            <div class="card-title">Configuración General del Sistema</div>
-            <div class="form-row">
-              <div class="form-group">
-                <label class="form-label">Ruta de Almacenamiento</label>
-                <input type="text" class="form-input" id="configPath" value="/var/videos/accidents">
+            <div class="card-title">⚙️ Configuración del Sistema YOLO</div>
+            
+            <!-- YOLO y Detección -->
+            <div style="background:#1E1E1E;padding:20px;border-radius:8px;margin-bottom:20px;border:2px solid #4CAF50;">
+              <h3 style="color:#4CAF50;margin-bottom:15px;">🎯 Detección de Accidentes</h3>
+              
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">Frames Requeridos para Confirmar</label>
+                  <input type="number" class="form-input" id="config_frames_requeridos" min="10" max="300" step="1">
+                  <small style="color:#999;font-size:11px;">Frames consecutivos necesarios (más = menos falsos positivos)</small>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Cooldown entre Confirmaciones (segundos)</label>
+                  <input type="number" class="form-input" id="config_cooldown_segundos" min="10" max="300" step="5">
+                  <small style="color:#999;font-size:11px;">Tiempo de espera entre accidentes confirmados</small>
+                </div>
               </div>
-              <div class="form-group">
-                <label class="form-label">Formato de Video</label>
-                <select class="form-input" id="configFormat">
-                  <option value="mp4">MP4</option>
-                  <option value="avi">AVI</option>
-                  <option value="mkv">MKV</option>
-                </select>
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label class="form-label">Tiempo de Grabación Post-Detección (segundos)</label>
-                <input type="number" class="form-input" id="configRecTime" value="30">
-              </div>
-              <div class="form-group">
-                <label class="form-label">Sensibilidad de Detección (0-100)</label>
-                <input type="number" class="form-input" id="configSensitivity" value="75" min="0" max="100">
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label class="form-label">Segundos Previos a Guardar</label>
-                <input type="number" class="form-input" id="configPreSeconds" value="5">
-              </div>
-              <div class="form-group">
-                <label class="form-label">Notificaciones</label>
-                <select class="form-input" id="configNotifications">
-                  <option value="all">Todas</option>
-                  <option value="critical">Solo Críticas</option>
-                  <option value="none">Ninguna</option>
-                </select>
+              
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">Confianza Mínima YOLO (0-1)</label>
+                  <input type="number" class="form-input" id="config_confianza_minima" min="0.1" max="1.0" step="0.05">
+                  <small style="color:#999;font-size:11px;">Umbral de confianza del modelo (0.75 = 75%)</small>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Notificaciones</label>
+                  <select class="form-input" id="config_notificaciones">
+                    <option value="all">Todas</option>
+                    <option value="critical">Solo Críticas</option>
+                    <option value="none">Ninguna</option>
+                  </select>
+                </div>
               </div>
             </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label class="form-label">Tiempo de Refresco (segundos)</label>
-                <input type="number" class="form-input" id="configRefresh" value="30">
+            
+            <!-- Grabación de Video -->
+            <div style="background:#1E1E1E;padding:20px;border-radius:8px;margin-bottom:20px;border:2px solid #FF9800;">
+              <h3 style="color:#FF9800;margin-bottom:15px;">🎬 Configuración de Grabación</h3>
+              
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">Segundos Previos (Buffer)</label>
+                  <input type="number" class="form-input" id="config_tiempo_grabacion_pre" min="5" max="30" step="1">
+                  <small style="color:#999;font-size:11px;">Frames guardados ANTES de la detección</small>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Segundos Posteriores</label>
+                  <input type="number" class="form-input" id="config_tiempo_grabacion_post" min="5" max="60" step="1">
+                  <small style="color:#999;font-size:11px;">Segundos grabados DESPUÉS de la confirmación</small>
+                </div>
+              </div>
+              
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">Formato de Video</label>
+                  <select class="form-input" id="config_formato_video">
+                    <option value="mp4">MP4 (Recomendado)</option>
+                    <option value="avi">AVI</option>
+                    <option value="mkv">MKV</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Ruta de Almacenamiento</label>
+                  <input type="text" class="form-input" id="config_ruta_videos" placeholder="C:\Videos\Accidentes">
+                </div>
               </div>
             </div>
-            <button class="btn btn-primary" onclick="saveConfig()">💾 Guardar Configuración</button>
+            
+            <!-- Botones -->
+            <div style="display:flex;gap:10px;">
+              <button class="btn btn-primary" onclick="saveConfig()">💾 Guardar y Aplicar Cambios</button>
+              <button class="btn btn-warning" onclick="loadConfig()">🔄 Recargar Configuración</button>
+              <button class="btn" style="background:#666;" onclick="resetConfig()">↩️ Restaurar Valores por Defecto</button>
+            </div>
+            
+            <!-- Info -->
+            <div style="margin-top:20px;padding:15px;background:rgba(255,152,0,0.1);border-left:4px solid #FF9800;border-radius:6px;">
+              <strong>⚠️ Importante:</strong> Los cambios se aplicarán a todas las cámaras activas. Las cámaras se reiniciarán automáticamente para aplicar la nueva configuración.
+            </div>
           </div>
         </div>
 
-        <!-- Usuarios -->
+<!-- Usuarios -->
         <div id="usuarios" class="page">
           <div class="card">
-            <div class="card-title">Gestión de Usuarios</div>
-            <button class="btn btn-primary" onclick="openUserModal()">➕ Agregar Usuario</button>
+            <div class="card-title">👥 Gestión de Usuarios</div>
+            <button class="btn btn-primary" onclick="openUserModal('create')">➕ Agregar</button>
+            <button class="btn btn-warning" onclick="loadUsers()">🔄 Recargar</button>
             <table class="data-table">
               <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Nombre</th>
-                  <th>Correo</th>
-                  <th>Rol</th>
-                  <th>Estado</th>
-                  <th>Acciones</th>
-                </tr>
+                <tr><th>ID</th><th>Nombre</th><th>Correo</th><th>Rol</th><th>Estado</th><th>Último Login</th><th>Acciones</th></tr>
               </thead>
-              <tbody id="usersTable"></tbody>
+              <tbody id="usersTable">
+                <tr><td colspan="7" style="text-align: center; color: #999;">Cargando...</td></tr>
+              </tbody>
             </table>
           </div>
         </div>
+
 
         <!-- Reportes -->
         <div id="reportes" class="page">
           <div class="card">
-            <div class="card-title">Reportes Generados</div>
-            <button class="btn btn-primary" onclick="generateReport()">📄 Generar Nuevo Reporte</button>
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>Reporte</th>
-                  <th>Fecha</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody id="reportsTable"></tbody>
-            </table>
+            <div class="card-title">Sistema de Reportes</div>
+            
+            <!-- Filtros de Fecha -->
+            <div class="form-row" style="margin-bottom:20px;">
+              <div class="form-group">
+                <label class="form-label">Fecha Inicio</label>
+                <input type="date" id="report-start-date" class="form-input">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Fecha Fin</label>
+                <input type="date" id="report-end-date" class="form-input">
+              </div>
+              <div class="form-group" style="display:flex;align-items:flex-end;">
+                <button class="btn btn-primary" onclick="loadAllReports()">🔍 Filtrar</button>
+              </div>
+            </div>
+            
+            <!-- Pestañas -->
+            <div style="display:flex;gap:10px;margin-bottom:20px;border-bottom:2px solid #444;">
+              <button class="btn btn-primary" id="tab-audit" onclick="showReportTab('audit')" style="border-radius:8px 8px 0 0;">📋 Auditoría</button>
+              <button class="btn" id="tab-access" onclick="showReportTab('access')" style="background:#3E3E42;border-radius:8px 8px 0 0;">🔐 Accesos</button>
+              <button class="btn" id="tab-accidents" onclick="showReportTab('accidents')" style="background:#3E3E42;border-radius:8px 8px 0 0;">🚨 Accidentes</button>
+            </div>
+            
+            <!-- Tabla de Auditoría -->
+            <div id="report-audit-content" class="report-content">
+              <button class="btn btn-success" onclick="exportReport('audit')" style="margin-bottom:15px;">📥 Exportar CSV</button>
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Tipo Evento</th>
+                    <th>Usuario</th>
+                    <th>Descripción</th>
+                    <th>Fecha/Hora</th>
+                    <th>IP</th>
+                  </tr>
+                </thead>
+                <tbody id="audit-table-body">
+                  <tr><td colspan="6" style="text-align:center;color:#999;">Cargando...</td></tr>
+                </tbody>
+              </table>
+            </div>
+            
+            <!-- Tabla de Accesos -->
+            <div id="report-access-content" class="report-content" style="display:none;">
+              <button class="btn btn-success" onclick="exportReport('access')" style="margin-bottom:15px;">📥 Exportar CSV</button>
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Fecha/Hora</th>
+                    <th>Usuario</th>
+                    <th>Correo</th>
+                    <th>Rol</th>
+                    <th>Estado</th>
+                    <th>IP</th>
+                  </tr>
+                </thead>
+                <tbody id="access-table-body">
+                  <tr><td colspan="7" style="text-align:center;color:#999;">Cargando...</td></tr>
+                </tbody>
+              </table>
+            </div>
+            
+            <!-- Tabla de Accidentes -->
+            <div id="report-accidents-content" class="report-content" style="display:none;">
+              <button class="btn btn-success" onclick="exportReport('accidents')" style="margin-bottom:15px;">📥 Exportar CSV</button>
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Fecha/Hora</th>
+                    <th>Cámara</th>
+                    <th>Ubicación</th>
+                    <th>Latitud</th>
+                    <th>Longitud</th>
+                    <th>Video</th>
+                  </tr>
+                </thead>
+                <tbody id="accidents-table-body">
+                  <tr><td colspan="7" style="text-align:center;color:#999;">Cargando...</td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
-      </div>
-    </div>
-  </div>
 
-  <!-- Modal Usuario -->
-  <div id="userModal" class="modal">
+  <!-- Modal Usuario Edit -->
+  <div id="userModalEdit" class="modal">
     <div class="modal-content">
       <div class="modal-header">
-        <span class="modal-close" onclick="closeUserModal()">&times;</span>
-        <span id="modalTitle">Agregar Usuario</span>
+        <span class="modal-close" onclick="closeUserModalEdit()">&times;</span>
+        <span id="modalUserTitle">Usuario</span>
       </div>
+      <input type="hidden" id="editUserId">
+      <div class="form-group"><label class="form-label">Nombre *</label><input type="text" class="form-input" id="editUserName"></div>
+      <div class="form-group"><label class="form-label">Correo *</label><input type="email" class="form-input" id="editUserEmail"></div>
+      <div class="form-group"><label class="form-label">Contraseña (vacío = mantener)</label><input type="password" class="form-input" id="editUserPassword"></div>
       <div class="form-group">
-        <label class="form-label">Nombre Completo</label>
-        <input type="text" class="form-input" id="userName" placeholder="Juan Pérez">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Correo Electrónico</label>
-        <input type="email" class="form-input" id="userEmail" placeholder="juan@ejemplo.com">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Rol</label>
-        <select class="form-input" id="userRole">
-          <option value="administrador">Administrador</option>
+        <label class="form-label">Rol *</label>
+        <select class="form-input" id="editUserRole">
+          <option value="admin">Admin</option>
           <option value="operador">Operador</option>
-          <option value="analista">Analista</option>
           <option value="emergencias">Emergencias</option>
         </select>
       </div>
-      <button class="btn btn-primary" onclick="saveUser()">💾 Guardar</button>
-      <button class="btn" style="background:#666;" onclick="closeUserModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveUserEdit()">💾 Guardar</button>
+      <button class="btn" style="background:#666;" onclick="closeUserModalEdit()">Cancelar</button>
     </div>
   </div>
 
@@ -574,6 +738,62 @@
   <div class="toast-container" id="toastContainer"></div>
 
 <script>
+  // === AÑADIR TOKEN JWT AUTOMÁTICAMENTE A TODAS LAS PETICIONES ===
+  const originalFetch = window.fetch;
+  window.fetch = async (url, options = {}) => {
+    const session = localStorage.getItem("session") || sessionStorage.getItem("session");
+    if (session) {
+      const token = JSON.parse(session).token;
+      options.headers = {
+        ...(options.headers || {}),
+        "Authorization": "Bearer " + token
+      };
+    }
+    return originalFetch(url, options);
+  };
+  
+    document.addEventListener("DOMContentLoaded", () => {
+      const permisos = JSON.parse(sessionStorage.getItem("permissions") || "{}");
+
+      const mapaBotones = {
+        dashboard: "btnDashboard",
+        camaras: "btnCamaras",
+        agregar_camara: "btnAgregarCamara",
+        monitoreo: "btnMonitoreo",
+        registros: "btnRegistros",
+        subir_video: "btnSubirVideo",
+        estadisticas: "btnEstadisticas",
+        mapa: "btnMapa",
+        config: "btnConfiguracion",
+        usuarios: "btnUsuarios",
+        reportes: "btnReportes",
+      };
+
+      for (const permiso in mapaBotones) {
+        const id = mapaBotones[permiso];
+        const boton = document.getElementById(id);
+        if (boton && !permisos[permiso]) {
+          boton.style.display = "none";
+        }
+      }
+    });
+  
+    
+document.addEventListener("DOMContentLoaded", () => {
+  const session = JSON.parse(localStorage.getItem("session") || sessionStorage.getItem("session") || "{}");
+
+  const nameLabel = document.getElementById("userNameLabel");
+  const roleLabel = document.getElementById("userRoleLabel");
+
+  if (session && session.nombre && session.rol) {
+    nameLabel.textContent = `👤 ${session.nombre}`;
+    roleLabel.textContent = `Rol: ${session.rol.charAt(0).toUpperCase() + session.rol.slice(1)}`;
+  } else {
+    nameLabel.textContent = "👤 Usuario";
+    roleLabel.textContent = "Sesión activa";
+  }
+});
+
   // ============================================
   // CONFIGURACIÓN
   // ============================================
@@ -623,6 +843,8 @@
     showToast('Error al conectar con backend', 'error');
   });
 
+
+
   // ============================================
   // LISTENERS DE DETECCIÓN YOLO
   // ============================================
@@ -630,8 +852,14 @@
   // Escuchar detecciones TENTATIVAS (sin confirmar)
   socket.on('tentative_detection', (data) => {
     console.log('⚠️ Detección tentativa:', data);
+    
+    // ✅ AGREGAR required_frames desde la config
+    if (window.liveConfig) {
+      data.required_frames = window.liveConfig.frames_requeridos;
+    }
+    
     updateDetectionProgress(data);
-  });
+  }); 
 
   // Escuchar ACCIDENTES CONFIRMADOS
   socket.on('severe_detected', (data) => {
@@ -678,8 +906,9 @@ function updateDetectionProgress(data) {
     feed.insertBefore(progressItem, feed.firstChild);
   }
   
-  // ✅ USAR VALORES DEL BACKEND (120 frames = 4.8 segundos a 25 FPS)
-  const progress = (data.consecutive_frames / data.required_frames) * 100;
+  // ✅ USAR VALORES DINÁMICOS (actualizar desde la configuración live)
+  const requiredFrames = window.liveConfig?.frames_requeridos || data.required_frames || 120;
+  const progress = (data.consecutive_frames / requiredFrames) * 100;
   const progressColor = progress >= 100 ? '#4CAF50' : '#FF9800';
   
   progressItem.innerHTML = `
@@ -695,7 +924,7 @@ function updateDetectionProgress(data) {
         <div style="margin-top:8px;">
           <div style="background:#1E1E1E;border-radius:10px;height:20px;overflow:hidden;">
             <div style="background:${progressColor};height:100%;width:${progress}%;transition:width 0.3s;display:flex;align-items:center;justify-content:center;color:#000;font-size:10px;font-weight:bold;">
-              ${data.consecutive_frames}/${data.required_frames}
+              ${data.consecutive_frames}/${requiredFrames}
             </div>
           </div>
         </div>
@@ -716,6 +945,68 @@ function updateDetectionProgress(data) {
     }
   }, 5000);
 }
+
+  // ============================================
+  // ACTUALIZACIÓN DE CONFIGURACIÓN EN TIEMPO REAL
+  // ============================================
+  
+  let liveConfigInterval = null;
+  window.liveConfig = null; // Variable global para acceder desde otras funciones
+  
+  async function updateLiveConfig() {
+    try {
+      const response = await fetch(`${API_URL}/config/live`);
+      const data = await response.json();
+      
+      if (data.success) {
+        window.liveConfig = data.config;
+        
+        // Actualizar panel de configuración
+        const framesEl = document.getElementById('live-config-frames');
+        const cooldownEl = document.getElementById('live-config-cooldown');
+        const confidenceEl = document.getElementById('live-config-confidence');
+        
+        if (framesEl) {
+          framesEl.innerText = `${data.config.frames_requeridos || 120} consecutivos`;
+        }
+        
+        if (cooldownEl) {
+          cooldownEl.innerText = `${data.config.cooldown_segundos || 60} segundos`;
+        }
+        
+        if (confidenceEl) {
+          const confidencePercent = Math.round((data.config.confianza_minima || 0.75) * 100);
+          confidenceEl.innerText = `${confidencePercent}%`;
+        }
+        
+        // Actualizar valores en DVR stats
+        cameras.forEach(cam => {
+          const reqSpan = document.getElementById(`dvr-required-${cam.id}`);
+          if (reqSpan) {
+            reqSpan.innerText = data.config.frames_requeridos || 120;
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error actualizando configuración live:', error);
+    }
+  }
+  
+  function startLiveConfigUpdates() {
+    // Actualizar inmediatamente
+    updateLiveConfig();
+    
+    // Actualizar cada 10 segundos
+    if (liveConfigInterval) clearInterval(liveConfigInterval);
+    liveConfigInterval = setInterval(updateLiveConfig, 10000);
+  }
+  
+  function stopLiveConfigUpdates() {
+    if (liveConfigInterval) {
+      clearInterval(liveConfigInterval);
+      liveConfigInterval = null;
+    }
+  }
 
   function addConfirmedDetectionToFeed(data) {
     const feed = document.getElementById('detection-feed');
@@ -983,11 +1274,15 @@ function updateDetectionProgress(data) {
       console.error('Error cargando usuarios:', error);
     }
   }
-
-  // ============================================
+ // ============================================
   // NAVEGACIÓN
   // ============================================
   function showPage(pageId) {
+    // ✅ Detener actualizaciones de config si sales de monitoreo
+    if (pageId !== 'monitoreo') {
+      stopLiveConfigUpdates();
+    }
+    
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.menu-button').forEach(b => b.classList.remove('active'));
     document.getElementById(pageId).classList.add('active');
@@ -1002,50 +1297,50 @@ function updateDetectionProgress(data) {
     }
     if (pageId === 'monitoreo') {
       initDVR();
-      setTimeout(() => updateGlobalStats(), 500);
+      setTimeout(() => {
+        updateGlobalStats();
+        startLiveConfigUpdates(); // ✅ Iniciar actualizaciones automáticas
+      }, 500);
     }
     if (pageId === 'registros') loadAccidents();
     if (pageId === 'estadisticas') initCharts();
     if (pageId === 'dashboard') updateDashboard();
     if (pageId === 'usuarios') loadUsers();
-    if (pageId === 'mapa') { initMainMap();
-}
-
+    if (pageId === 'mapa') {
+      initMainMap();
+    } // ✅ FALTABA ESTE CIERRE
+    if (pageId === 'reportes') {
+      setTimeout(() => {
+        // Establecer fechas por defecto (último mes)
+        const today = new Date();
+        const lastMonth = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+        
+        document.getElementById('report-start-date').value = lastMonth.toISOString().split('T')[0];
+        document.getElementById('report-end-date').value = today.toISOString().split('T')[0];
+        
+        showReportTab('audit');
+      }, 100);
+    }
+    if (pageId === 'config') {
+      setTimeout(() => loadConfig(), 100);
+    }
   }
+  
 
   function logout() {
-    if (confirm('¿Desea cerrar sesión?')) {
-      showToast('Sesión cerrada', 'success');
-      setTimeout(() => location.reload(), 1000);
-    }
+  if (confirm('¿Desea cerrar sesión?')) {
+    // 🔹 Borra todos los datos de sesión
+    localStorage.removeItem('session');
+    sessionStorage.removeItem('session');
+    sessionStorage.removeItem('permissions');
+
+    showToast('Sesión cerrada', 'success');
+
+    // 🔹 Redirige al login después de un segundo
+    setTimeout(() => {
+      window.location.href = 'login.html';
+    }, 1000);
   }
-let mainMap = null;
-let mainMarker = null;
-
-function initMainMap() {
-  if (mainMap !== null) return;
-
-  const defaultLat = 4.6097;
-  const defaultLng = -74.0817;
-
-  mainMap = L.map('mapContainerMapa').setView([defaultLat, defaultLng], 13);
-
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap contributors',
-    maxZoom: 19
-  }).addTo(mainMap);
-
-  mainMap.on('click', function(e) {
-    const lat = e.latlng.lat;
-    const lng = e.latlng.lng;
-
-    if (mainMarker !== null) {
-      mainMap.removeLayer(mainMarker);
-    }
-
-    mainMarker = L.marker([lat, lng]).addTo(mainMap);
-    showToast(`Punto seleccionado: ${lat.toFixed(6)}, ${lng.toFixed(6)}`, 'info');
-  });
 }
 
 function showAllCameras() {
@@ -1788,125 +2083,433 @@ async function downloadAnnotatedVideo() {
   function downloadResults() {
     downloadAnnotatedVideo();
   }
+// ============================================
+// 📊 ESTADÍSTICAS COMPLETAS
+// ============================================
 
-  // ============================================
-  // ESTADÍSTICAS
-  // ============================================
+// =========================
+//  VARIABLES GLOBALES
+// =========================
 
-  let charts = {};
+let charts = {
+    hour: null,
+    day: null,
+    month: null
+};
 
-  function initCharts() {
-    createHourChart();
-    createZoneChart();
-    createCameraChart();
-  }
-
-  function createHourChart() {
-    const ctx = document.getElementById('hourChart').getContext('2d');
-    if (charts.hour) charts.hour.destroy();
-    
-    const hourData = [0,0,0,0,0,0];
-    accidents.forEach(acc => {
-      const hour = new Date(acc.fecha_accidente).getHours();
-      const slot = Math.floor(hour / 4);
-      hourData[slot]++;
+async function initCharts() {
+  try {
+    const session = getSession();
+    const response = await fetch(`${API_URL}/accidents?limit=1000`, {
+      headers: { 'Authorization': `Bearer ${session.token}` }
     });
-    
-    charts.hour = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: ['00-04', '04-08', '08-12', '12-16', '16-20', '20-24'],
-        datasets: [{
-          label: 'Accidentes SEVERE',
-          data: hourData,
-          backgroundColor: '#E53935'
-        }]
-      },
-      options: {
-        responsive: true,
-        plugins: { legend: { labels: { color: '#E0E0E0' } } },
-        scales: {
-          y: { ticks: { color: '#E0E0E0' }, grid: { color: '#444' } },
-          x: { ticks: { color: '#E0E0E0' }, grid: { color: '#444' } }
-        }
-      }
-    });
-  }
-
-  function createZoneChart() {
-    const ctx = document.getElementById('zoneChart').getContext('2d');
-    if (charts.zone) charts.zone.destroy();
-    
-    const zoneData = {};
-    accidents.forEach(acc => {
-      const zone = acc.camera_ip || `Cámara ${acc.id_camara}`;
-      zoneData[zone] = (zoneData[zone] || 0) + 1;
-    });
-    
-    const labels = Object.keys(zoneData);
-    const data = Object.values(zoneData);
-    
-    if (labels.length === 0) {
-      labels.push('Sin datos');
-      data.push(0);
+    const data = await response.json();
+    if (data.success) {
+      updateStatsSummary(data.accidents);
+      createHourChart(data.accidents);
+      createSeverityChart(data.accidents);
+      createCameraChart(data.accidents);
+      createWeeklyChart(data.accidents);
     }
-    
-    charts.zone = new Chart(ctx, {
-      type: 'pie',
-      data: {
-        labels: labels,
-        datasets: [{
-          data: data,
-          backgroundColor: ['#E53935', '#FF9800', '#4CAF50', '#007ACC', '#9C27B0']
-        }]
-      },
-      options: {
-        responsive: true,
-        plugins: { legend: { labels: { color: '#E0E0E0' } } }
+  } catch (error) {
+    console.error('Error stats:', error);
+  }
+}
+
+function updateStatsSummary(accidents) {
+  document.getElementById('stat-total-accidents').innerText = accidents.length;
+  document.getElementById('stat-cameras-active').innerText = cameras.filter(c => c.is_streaming).length;
+  const now = new Date();
+  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  document.getElementById('stat-last-24h').innerText = accidents.filter(a => new Date(a.fecha_accidente) > yesterday).length;
+  if (accidents.length > 0) {
+    const first = new Date(accidents[accidents.length - 1].fecha_accidente);
+    const last = new Date(accidents[0].fecha_accidente);
+    const days = Math.max(1, Math.ceil((last - first) / (1000 * 60 * 60 * 24)));
+    document.getElementById('stat-avg-per-day').innerText = (accidents.length / days).toFixed(1);
+  }
+}
+
+function createHourChart(accidents) {
+  const ctx = document.getElementById('hourChart').getContext('2d');
+  if (charts.hour) charts.hour.destroy();
+  const hourData = new Array(24).fill(0);
+  accidents.forEach(acc => hourData[new Date(acc.fecha_accidente).getHours()]++);
+  const avg = hourData.reduce((a, b) => a + b, 0) / 24;
+  charts.hour = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: [...Array(24).keys()].map(h => `${String(h).padStart(2, '0')}:00`),
+      datasets: [{
+        label: 'Accidentes',
+        data: hourData,
+        borderColor: '#42A5F5',
+        backgroundColor: 'rgba(66,165,245,0.2)',
+        fill: true,
+        tension: 0.4
+      }, {
+        label: 'Promedio',
+        data: new Array(24).fill(avg),
+        borderColor: '#FFB300',
+        borderDash: [8, 5],
+        borderWidth: 2,
+        pointRadius: 0
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color: '#E0E0E0' } } },
+      scales: {
+        x: { ticks: { color: '#E0E0E0' }, grid: { color: '#444' } },
+        y: { ticks: { color: '#E0E0E0' }, grid: { color: '#444' }, beginAtZero: true }
       }
-    });
+    }
+  });
+}
+
+function createSeverityChart(accidents) {
+  const ctx = document.getElementById('severityChart').getContext('2d');
+  if (charts.severity) charts.severity.destroy();
+  const severityData = { 'BAJA': 0, 'MEDIA': 0, 'ALTA': 0, 'CRÍTICA': 0 };
+  accidents.forEach(acc => { if (severityData[acc.severidad] !== undefined) severityData[acc.severidad]++; });
+  const data = Object.values(severityData);
+  const total = data.reduce((a, b) => a + b, 0);
+  const colors = ['#4CAF50', '#FF9800', '#E53935', '#B71C1C'];
+  charts.severity = new Chart(ctx, {
+    type: 'doughnut',
+    data: { labels: Object.keys(severityData), datasets: [{ data: data, backgroundColor: colors, borderWidth: 2, borderColor: '#252526' }] },
+    options: { responsive: true, plugins: { legend: { display: false } } }
+  });
+  const legend = document.getElementById('severity-legend');
+  legend.innerHTML = Object.keys(severityData).map((label, i) => {
+    const percent = total > 0 ? ((data[i] / total) * 100).toFixed(1) : 0;
+    return `<div style="display:flex;align-items:center;gap:15px;padding:12px;background:#1E1E1E;border-radius:8px;border-left:4px solid ${colors[i]};"><div style="width:50px;height:50px;background:${colors[i]};border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:bold;color:#FFF;">${data[i]}</div><div style="flex:1;"><div style="font-weight:bold;color:${colors[i]};font-size:16px;">${label}</div><div style="color:#999;font-size:12px;">${percent}% del total</div></div></div>`;
+  }).join('');
+}
+
+function createCameraChart(accidents) {
+  const ctx = document.getElementById('cameraChart').getContext('2d');
+  if (charts.camera) charts.camera.destroy();
+  const cameraData = {};
+  accidents.forEach(acc => { const camIP = acc.camera_ip || `Cámara ${acc.id_camara}`; cameraData[camIP] = (cameraData[camIP] || 0) + 1; });
+  const sorted = Object.entries(cameraData).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  const data = sorted.map(([_, count]) => count);
+  charts.camera = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: sorted.map(([ip]) => ip), datasets: [{ label: 'Accidentes', data: data, backgroundColor: data.map(v => v > 50 ? '#E53935' : v > 20 ? '#FB8C00' : v > 10 ? '#FFB300' : '#43A047'), borderRadius: 6 }] },
+    options: {
+      responsive: true,
+      indexAxis: 'y',
+      plugins: { legend: { display: false } },
+      scales: { x: { ticks: { color: '#E0E0E0' }, grid: { color: '#444' }, beginAtZero: true }, y: { ticks: { color: '#E0E0E0' }, grid: { color: '#444' } } }
+    }
+  });
+}
+
+function createWeeklyChart(accidents) {
+  const ctx = document.getElementById('weeklyChart').getContext('2d');
+  if (charts.weekly) charts.weekly.destroy();
+  const last7Days = [];
+  const today = new Date();
+  for (let i = 6; i >= 0; i--) {
+    const date = new Date(today);
+    date.setDate(date.getDate() - i);
+    date.setHours(0, 0, 0, 0);
+    last7Days.push(date);
+  }
+  const dailyData = last7Days.map(date => {
+    const nextDay = new Date(date);
+    nextDay.setDate(nextDay.getDate() + 1);
+    return accidents.filter(acc => {
+      const accDate = new Date(acc.fecha_accidente);
+      return accDate >= date && accDate < nextDay;
+    }).length;
+  });
+  charts.weekly = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: last7Days.map(d => `${d.toLocaleDateString('es-CO', { weekday: 'short' })} ${d.getDate()}`),
+      datasets: [{ label: 'Accidentes', data: dailyData, borderColor: '#E53935', backgroundColor: 'rgba(229,57,53,0.2)', fill: true, tension: 0.4, pointBackgroundColor: '#C62828', pointRadius: 5, borderWidth: 3 }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color: '#E0E0E0' } } },
+      scales: { x: { ticks: { color: '#E0E0E0' }, grid: { color: '#444' } }, y: { ticks: { color: '#E0E0E0', stepSize: 1 }, grid: { color: '#444' }, beginAtZero: true } }
+    }
+  });
+}
+// ============================================
+// 🗺️ MAPA DE CALOR + ACCIDENTES + CÁMARAS COMPLETO
+// ============================================
+let mainMap = null;
+let heatmapLayer = null;
+let camerasLayer = null;
+let markersLayer = null;
+
+// ---------------------------
+// Inicializar mapa principal
+// ---------------------------
+function initMainMap() {
+  if (mainMap !== null) return;
+
+  const defaultLat = 4.6097;
+  const defaultLng = -74.0817;
+
+  mainMap = L.map("mapContainerMapa").setView([defaultLat, defaultLng], 13);
+
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "© OpenStreetMap contributors",
+    maxZoom: 19
+  }).addTo(mainMap);
+}
+
+// ============================================
+// 📹 MOSTRAR TODAS LAS CÁMARAS
+// ============================================
+function showAllCameras() {
+  if (!mainMap) {
+    initMainMap();
+    setTimeout(showAllCameras, 500);
+    return;
   }
 
-  function createCameraChart() {
-    const ctx = document.getElementById('cameraChart').getContext('2d');
-    if (charts.camera) charts.camera.destroy();
-    
-    const cameraData = {};
-    accidents.forEach(acc => {
-      const camId = acc.id_camara;
-      cameraData[camId] = (cameraData[camId] || 0) + 1;
-    });
-    
-    const labels = Object.keys(cameraData).map(id => `Cámara ${id}`);
-    const data = Object.values(cameraData);
-    
-    if (labels.length === 0) {
-      labels.push('Cámara 1');
-      data.push(0);
+  // Limpiar capas anteriores
+  clearMapMarkers();
+
+  if (!cameras || cameras.length === 0) {
+    showToast("No hay cámaras registradas", "warning");
+    updateMapStats(0, 0, 0);
+    return;
+  }
+
+  camerasLayer = L.layerGroup();
+  let validCameras = 0;
+
+  cameras.forEach(cam => {
+    const lat = parseFloat(cam.latitud);
+    const lng = parseFloat(cam.longitud);
+
+    if (!isNaN(lat) && !isNaN(lng)) {
+      const marker = L.marker([lat, lng]);
+      marker.bindPopup(`
+        <div style="color:#000;">
+          <strong>Cámara ${cam.id || 'N/A'}</strong><br>
+          IP: ${cam.ip || 'N/A'}:${cam.puerto || 'N/A'}<br>
+          Estado: ${cam.is_streaming ? "🟢 Activa" : "⚫ Inactiva"}
+        </div>
+      `);
+      marker.addTo(camerasLayer);
+      validCameras++;
     }
-    
-    charts.camera = new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: labels,
-        datasets: [{
-          label: 'Detecciones SEVERE',
-          data: data,
-          borderColor: '#4CAF50',
-          backgroundColor: 'rgba(76, 175, 80, 0.1)',
-          tension: 0.4
-        }]
-      },
-      options: {
-        responsive: true,
-        plugins: { legend: { labels: { color: '#E0E0E0' } } },
-        scales: {
-          y: { ticks: { color: '#E0E0E0' }, grid: { color: '#444' } },
-          x: { ticks: { color: '#E0E0E0' }, grid: { color: '#444' } }
-        }
+  });
+
+  if (validCameras > 0) camerasLayer.addTo(mainMap);
+  showToast(`${validCameras} cámaras mostradas`, "success");
+  updateMapStats(validCameras, 0, 0);
+
+  // Centrar en la primera cámara
+  if (validCameras > 0) {
+    const firstCam = cameras.find(cam => !isNaN(parseFloat(cam.latitud)) && !isNaN(parseFloat(cam.longitud)));
+    if (firstCam) mainMap.setView([parseFloat(firstCam.latitud), parseFloat(firstCam.longitud)], 13);
+  }
+}
+
+// ============================================
+// 🚨 MOSTRAR ACCIDENTES
+// ============================================
+function showAllAccidents() {
+  if (!mainMap) {
+    initMainMap();
+    setTimeout(showAllAccidents, 500);
+    return;
+  }
+
+  clearMapMarkers();
+
+  if (!accidents || accidents.length === 0) {
+    showToast("No hay accidentes registrados", "warning");
+    updateMapStats(0, 0, 0);
+    return;
+  }
+
+  markersLayer = L.layerGroup();
+  let criticalCount = 0;
+  let firstValidAccident = null;
+  let validAccidents = 0;
+
+  accidents.forEach(acc => {
+    if (!acc) return;
+
+    const lat = parseFloat(acc.latitud);
+    const lng = parseFloat(acc.longitud);
+
+    if (!isNaN(lat) && !isNaN(lng)) {
+      if (!firstValidAccident) firstValidAccident = { lat, lng };
+
+      const severidad = (acc.severidad || "BAJA").toUpperCase();
+      const color = severidad === "CRÍTICA" || severidad === "CRITICA" ? "#B71C1C"
+                  : severidad === "ALTA" ? "#E53935"
+                  : severidad === "MEDIA" ? "#FF9800"
+                  : "#4CAF50";
+
+      if (severidad === "CRÍTICA" || severidad === "CRITICA") criticalCount++;
+
+      const marker = L.circleMarker([lat, lng], {
+        radius: 10,
+        color: color,
+        fillColor: color,
+        fillOpacity: 0.9
+      });
+      marker.bindPopup(`
+        <div style="color:black;font-weight:bold;">
+          🚨 Accidente ID: ${acc.id || 'N/A'}<br>
+          Severidad: ${severidad}<br>
+          Fecha: ${acc.fecha || 'N/A'}
+        </div>
+      `);
+      marker.addTo(markersLayer);
+      validAccidents++;
+    }
+  });
+
+  if (validAccidents > 0) {
+    markersLayer.addTo(mainMap);
+    if (firstValidAccident) mainMap.setView([firstValidAccident.lat, firstValidAccident.lng], 13);
+  }
+
+  showToast(`${validAccidents} accidentes mostrados`, "success");
+  updateMapStats(0, validAccidents, criticalCount);
+}
+
+// ============================================
+// 🔥 MAPA DE CALOR TRANSPARENTE CON LOGS COMPLETOS
+// ============================================
+function toggleHeatmap1() {
+  console.log("Botón presionado - toggleHeatmap ejecutado");
+
+  if (!mainMap) {
+    initMainMap();
+    setTimeout(toggleHeatmap1, 500);
+    return;
+  }
+
+  const info = document.getElementById("heatmapInfo");
+
+  // Desactivar heatmap existente
+  if (heatmapLayer) {
+    mainMap.removeLayer(heatmapLayer);
+    heatmapLayer = null;
+    if (info) info.style.display = "none";
+    showToast("Mapa de calor desactivado", "info");
+    return;
+  }
+
+  clearMapMarkers();
+
+  if (!accidents || accidents.length === 0) {
+    showToast("No hay accidentes para el mapa de calor", "warning");
+    return;
+  }
+
+  mainMap.whenReady(() => {
+    console.log("🔥 Configurando heatmap transparente sin fondo...");
+
+    const heatData = [];
+    let firstPoint = null;
+
+    // Recorrer accidentes y filtrar coordenadas válidas
+    accidents.forEach(acc => {
+      if (acc && acc.latitud && acc.longitud && !isNaN(acc.latitud) && !isNaN(acc.longitud)) {
+        const lat = parseFloat(acc.latitud);
+        const lng = parseFloat(acc.longitud);
+        heatData.push([lat, lng, 1.0]);
+        if (!firstPoint) firstPoint = { lat, lng };
       }
     });
-  }
+
+    // Logs para depuración
+    console.log("accidents raw:", accidents);
+    console.log("Cantidad total de accidentes:", accidents.length);
+    console.log("🔥 Datos filtrados para heatmap:", heatData);
+    console.log("Cantidad de puntos válidos:", heatData.length);
+
+    if (heatData.length === 0) {
+      showToast("No hay accidentes con coordenadas válidas", "warning");
+      return;
+    }
+
+    // Crear heatmap
+    heatmapLayer = L.heatLayer(heatData, {
+      radius: 70,
+      blur: 45,
+      maxZoom: 11,
+      max: 1.0,
+      minOpacity: 0.0,
+      gradient: {
+        0.0: "rgba(0,0,0,0)",
+        0.2: "rgba(0,0,0,0)",
+        0.4: "rgba(0,255,0,0.3)",
+        0.6: "rgba(255,255,0,0.5)",
+        0.8: "rgba(255,165,0,0.7)",
+        1.0: "rgba(255,0,0,0.85)"
+      }
+    }).addTo(mainMap);
+
+    // Forzar transparencia del canvas
+    setTimeout(() => {
+      const overlayPane = mainMap.getPanes().overlayPane;
+      if (overlayPane) {
+        const canvas = overlayPane.querySelector('canvas');
+        if (canvas) {
+          canvas.style.backgroundColor = "transparent";
+          canvas.style.opacity = "1";
+          console.log("✅ Canvas transparente listo");
+        }
+        overlayPane.style.backgroundColor = "transparent";
+      }
+    }, 500);
+
+    // Centrar mapa en primer punto válido
+    if (firstPoint) mainMap.setView([firstPoint.lat, firstPoint.lng], 13);
+
+    // Mostrar info en pantalla
+    if (info) {
+      info.style.display = "block";
+      info.innerHTML = `
+        🔥 Mapa de Calor Activo<br>
+        📍 Puntos: ${heatData.length}<br>
+        🔴 Rojo = Mayor concentración
+      `;
+    }
+
+    showToast(`Mapa de calor activado (${heatData.length} puntos)`, "success");
+  });
+}
+
+// ============================================
+// 🗑️ LIMPIAR TODO
+// ============================================
+function clearMapMarkers() {
+  if (markersLayer) { markersLayer.clearLayers(); mainMap.removeLayer(markersLayer); markersLayer = null; }
+  if (camerasLayer) { mainMap.removeLayer(camerasLayer); camerasLayer = null; }
+  if (heatmapLayer) { mainMap.removeLayer(heatmapLayer); heatmapLayer = null; }
+  const info = document.getElementById("heatmapInfo");
+  if (info) info.style.display = "none";
+  updateMapStats(0, 0, 0);
+}
+
+// ============================================
+// 📊 ACTUALIZAR ESTADÍSTICAS
+// ============================================
+function updateMapStats(cameras, accidents, critical) {
+  const camEl = document.getElementById("map-stat-cameras");
+  const accEl = document.getElementById("map-stat-accidents");
+  const critEl = document.getElementById("map-stat-critical");
+  if (camEl) camEl.innerText = cameras || 0;
+  if (accEl) accEl.innerText = accidents || 0;
+  if (critEl) critEl.innerText = critical || 0;
+}
+
 
   // ============================================
   // USUARIOS
@@ -2034,6 +2637,136 @@ async function updateSystemConfig() {
     console.error('Error actualizando configuración:', error);
   }
 }
+// ============================================
+// 👥 USUARIOS - EDICIÓN
+// ============================================
+function openUserModal(mode, userId = null) {
+  const modal = document.getElementById('userModalEdit');
+  const title = document.getElementById('modalUserTitle');
+  if (mode === 'create') {
+    title.innerText = '➕ Agregar Usuario';
+    document.getElementById('editUserId').value = '';
+    document.getElementById('editUserName').value = '';
+    document.getElementById('editUserEmail').value = '';
+    document.getElementById('editUserPassword').value = '';
+    document.getElementById('editUserRole').value = 'operador';
+  } else if (mode === 'edit' && userId) {
+    title.innerText = '✏️ Editar Usuario';
+    const user = users.find(u => u.id === userId);
+    if (user) {
+      document.getElementById('editUserId').value = user.id;
+      document.getElementById('editUserName').value = user.nombre;
+      document.getElementById('editUserEmail').value = user.correo;
+      document.getElementById('editUserPassword').value = '';
+      document.getElementById('editUserRole').value = user.role;
+    }
+  }
+  modal.classList.add('show');
+}
+
+function closeUserModalEdit() {
+  document.getElementById('userModalEdit').classList.remove('show');
+}
+
+async function saveUserEdit() {
+  const userId = document.getElementById('editUserId').value;
+  const nombre = document.getElementById('editUserName').value.trim();
+  const correo = document.getElementById('editUserEmail').value.trim();
+  const password = document.getElementById('editUserPassword').value;
+  const rol = document.getElementById('editUserRole').value;
+  if (!nombre || !correo) { showToast('Nombre y correo requeridos', 'error'); return; }
+  const session = getSession();
+  const data = { nombre, correo, rol };
+  if (password) data.password = password;
+  try {
+    const url = userId ? `${API_URL}/users/${userId}` : `${API_URL}/users`;
+    const method = userId ? 'PUT' : 'POST';
+    const response = await fetch(url, {
+      method: method,
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.token}` },
+      body: JSON.stringify(data)
+    });
+    const result = await response.json();
+    if (result.success) {
+      showToast(userId ? 'Usuario actualizado' : 'Usuario creado', 'success');
+      closeUserModalEdit();
+      loadUsers();
+    } else {
+      showToast('Error: ' + result.error, 'error');
+    }
+  } catch (error) {
+    showToast('Error guardando usuario', 'error');
+  }
+}
+
+function renderUsers() {
+  const table = document.getElementById('usersTable');
+  table.innerHTML = '';
+  if (users.length === 0) {
+    table.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#999;">No hay usuarios</td></tr>';
+    return;
+  }
+  const session = getSession();
+  const currentUserId = session ? session.user_id : null;
+  users.forEach(user => {
+    const roleColors = { 'admin': '#FFB300', 'operador': '#2196F3', 'emergencias': '#E53935' };
+    const roleIcons = { 'admin': '👑', 'operador': '👨‍💼', 'emergencias': '🚨' };
+    const roleColor = roleColors[user.role] || '#999';
+    const roleIcon = roleIcons[user.role] || '👤';
+    const activo = user.activo !== false && user.activo !== 0;
+    const lastLogin = user.last_login ? new Date(new Date(user.last_login).getTime() + 5 * 60 * 60 * 1000).toLocaleString('es-CO') : '<span style="color:#666;">Nunca</span>';
+    const canDelete = user.id !== currentUserId;
+    
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="font-weight:bold;">${user.id}</td>
+      <td>${user.nombre}</td>
+      <td style="color:#999;">${user.correo}</td>
+      <td><span style="color:${roleColor};font-weight:bold;">${roleIcon} ${user.role.toUpperCase()}</span></td>
+      <td>${activo ? '<span style="color:#4CAF50;">✅ Activo</span>' : '<span style="color:#E53935;">❌ Inactivo</span>'}</td>
+      <td style="font-size:11px;color:#999;">${lastLogin}</td>
+      <td>
+        <button class="btn btn-warning" onclick="openUserModal('edit', ${user.id})" style="font-size:11px;padding:4px 8px;margin-right:4px;">✏️ Editar</button>
+        ${canDelete ? `<button class="btn btn-danger" onclick="deleteUserConfirm(${user.id})" style="font-size:11px;padding:4px 8px;">🗑️</button>` : '<span style="font-size:10px;color:#666;">(Usuario actual)</span>'}
+      </td>
+    `;
+    table.appendChild(tr);
+  });
+  document.getElementById("dash-users").innerText = users.length;
+}
+
+async function deleteUserConfirm(userId) {
+  if (!confirm('¿Eliminar este usuario?')) return;
+  try {
+    const session = getSession();
+    const response = await fetch(`${API_URL}/users/${userId}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${session.token}` }
+    });
+    const result = await response.json();
+    if (result.success) {
+      showToast('Usuario eliminado', 'success');
+      loadUsers();
+    } else {
+      showToast('Error: ' + result.error, 'error');
+    }
+  } catch (error) {
+    showToast('Error eliminando usuario', 'error');
+  }
+}
+
+function getSession() {
+  const localSession = localStorage.getItem('session');
+  const sessionSession = sessionStorage.getItem('session');
+  if (localSession) return JSON.parse(localSession);
+  if (sessionSession) return JSON.parse(sessionSession);
+  return null;
+}
+
+ function getToken() {
+    const session = getSession();
+    return session ? session.token : null;
+  }
 
 // Actualizar cada 10 segundos
 setInterval(updateSystemConfig, 10000);
@@ -2042,8 +2775,125 @@ setInterval(updateSystemConfig, 10000);
   // CONFIGURACIÓN
   // ============================================
 
+  // ============================================
+  // CONFIGURACIÓN DEL SISTEMA
+  // ============================================
+  
+  async function loadConfig() {
+    try {
+      const response = await fetch(`${API_URL}/config`, {
+        headers: {
+          'Authorization': `Bearer ${getToken()}`
+        }
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        const config = data.config;
+        
+        // Cargar valores en los inputs
+        document.getElementById('config_frames_requeridos').value = config.frames_requeridos || 120;
+        document.getElementById('config_cooldown_segundos').value = config.cooldown_segundos || 60;
+        document.getElementById('config_confianza_minima').value = config.confianza_minima || 0.75;
+        document.getElementById('config_tiempo_grabacion_pre').value = config.tiempo_grabacion_pre || 15;
+        document.getElementById('config_tiempo_grabacion_post').value = config.tiempo_grabacion_post || 15;
+        document.getElementById('config_ruta_videos').value = config.ruta_videos || '';
+        document.getElementById('config_formato_video').value = config.formato_video || 'mp4';
+        document.getElementById('config_notificaciones').value = config.notificaciones || 'all';
+        
+        showToast('Configuración cargada correctamente', 'success');
+      } else {
+        showToast('Error cargando configuración', 'error');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      showToast('Error conectando con el servidor', 'error');
+    }
+  }
+  
   async function saveConfig() {
-    showToast('Configuración guardada localmente', 'info');
+    try {
+      const config = {
+        frames_requeridos: parseInt(document.getElementById('config_frames_requeridos').value),
+        cooldown_segundos: parseInt(document.getElementById('config_cooldown_segundos').value),
+        confianza_minima: parseFloat(document.getElementById('config_confianza_minima').value),
+        tiempo_grabacion_pre: parseInt(document.getElementById('config_tiempo_grabacion_pre').value),
+        tiempo_grabacion_post: parseInt(document.getElementById('config_tiempo_grabacion_post').value),
+        ruta_videos: document.getElementById('config_ruta_videos').value,
+        formato_video: document.getElementById('config_formato_video').value,
+        notificaciones: document.getElementById('config_notificaciones').value
+      };
+      
+      // Validaciones
+      if (config.frames_requeridos < 10 || config.frames_requeridos > 300) {
+        showToast('Frames requeridos debe estar entre 10 y 300', 'error');
+        return;
+      }
+      
+      if (config.confianza_minima < 0.1 || config.confianza_minima > 1.0) {
+        showToast('Confianza debe estar entre 0.1 y 1.0', 'error');
+        return;
+      }
+      
+      showToast('Guardando configuración...', 'info');
+      
+      const response = await fetch(`${API_URL}/config`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getToken()}`
+        },
+        body: JSON.stringify(config)
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        showToast('✅ Configuración guardada y aplicada', 'success');
+        setTimeout(() => loadConfig(), updateLiveConfig(), 1000);
+      } else {
+        showToast('Error: ' + (data.error || 'Desconocido'), 'error');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      showToast('Error guardando configuración', 'error');
+    }
+  }
+  
+  async function resetConfig() {
+    if (!confirm('¿Restaurar valores por defecto? Las cámaras activas se reiniciarán.')) return;
+    
+    try {
+      const defaultConfig = {
+        frames_requeridos: 120,
+        cooldown_segundos: 60,
+        confianza_minima: 0.75,
+        tiempo_grabacion_pre: 15,
+        tiempo_grabacion_post: 15,
+        ruta_videos: 'C:\\Users\\Ramirez\\Desktop\\ACCIDENT\\BACKEND\\clips',
+        formato_video: 'mp4',
+        notificaciones: 'all'
+      };
+      
+      const response = await fetch(`${API_URL}/config`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getToken()}`
+        },
+        body: JSON.stringify(defaultConfig)
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        showToast('Configuración restaurada a valores por defecto', 'success');
+        setTimeout(() => loadConfig(), 1000);
+      }
+    } catch (error) {
+      showToast('Error restaurando configuración', 'error');
+    }
   }
 
   // ============================================
@@ -2057,12 +2907,186 @@ setInterval(updateSystemConfig, 10000);
     showToast(isActive ? 'Mapa de calor desactivado' : 'Mapa de calor activado', 'info');
     }
 
-  function generateReport() {
-    showToast('Generando reporte...', 'info');
+// ============================================
+  // SISTEMA DE REPORTES
+  // ============================================
+  
+  let currentReportTab = 'audit';
+  
+  function showReportTab(tab) {
+    currentReportTab = tab;
+    
+    // Ocultar todos los contenidos
+    document.querySelectorAll('.report-content').forEach(el => el.style.display = 'none');
+    
+    // Quitar estilo activo de todos los tabs
+    document.getElementById('tab-audit').className = 'btn';
+    document.getElementById('tab-audit').style.background = '#3E3E42';
+    document.getElementById('tab-access').className = 'btn';
+    document.getElementById('tab-access').style.background = '#3E3E42';
+    document.getElementById('tab-accidents').className = 'btn';
+    document.getElementById('tab-accidents').style.background = '#3E3E42';
+    
+    // Mostrar contenido activo
+    document.getElementById(`report-${tab}-content`).style.display = 'block';
+    document.getElementById(`tab-${tab}`).className = 'btn btn-primary';
+    
+    // Cargar datos
+    loadReportData(tab);
+  }
+  
+  async function loadAllReports() {
+    showToast('Actualizando reportes...', 'info');
+    await loadReportData(currentReportTab);
+  }
+  
+  async function loadReportData(type) {
+    const startDate = document.getElementById('report-start-date').value;
+    const endDate = document.getElementById('report-end-date').value;
+    
+    let url = `${API_URL}/reports/${type}?`;
+    if (startDate) url += `start_date=${startDate}&`;
+    if (endDate) url += `end_date=${endDate}`;
+    
+    try {
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${getToken()}`
+        }
+      });
+      const data = await response.json();
+      
+      if (data.success) {
+        if (type === 'audit') populateAuditTable(data.data);
+        else if (type === 'access') populateAccessTable(data.data);
+        else if (type === 'accidents') populateAccidentsTable(data.data);
+        
+        showToast(`${data.count} registros cargados`, 'success');
+      } else {
+        showToast('Error cargando reportes: ' + (data.error || 'Desconocido'), 'error');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      showToast('Error conectando con el servidor', 'error');
+    }
+  }
+  
+  function populateAuditTable(data) {
+    const tbody = document.getElementById('audit-table-body');
+    tbody.innerHTML = '';
+    
+    if (!data || data.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#999;">No hay registros</td></tr>';
+      return;
+    }
+    
+    data.forEach(row => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${row.id}</td>
+        <td>${row.tipo_evento || 'N/A'}</td>
+        <td>${row.nombre_usuario || 'Sistema'}</td>
+        <td>${row.descripcion || ''}</td>
+        <td>${new Date(row.fecha_hora).toLocaleString('es-CO')}</td>
+        <td>${row.ip_usuario || 'N/A'}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+  
+  function populateAccessTable(data) {
+    const tbody = document.getElementById('access-table-body');
+    tbody.innerHTML = '';
+    
+    if (!data || data.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#999;">No hay registros</td></tr>';
+      return;
+    }
+    
+    data.forEach(row => {
+      const tr = document.createElement('tr');
+      const estadoColor = row.estado === 'Exitoso' ? '#4CAF50' : row.estado === 'Fallido' ? '#E53935' : '#FF9800';
+      
+      tr.innerHTML = `
+        <td>${row.id}</td>
+        <td>${new Date(row.fecha_hora).toLocaleString('es-CO')}</td>
+        <td>${row.nombre_usuario || 'N/A'}</td>
+        <td>${row.correo || 'N/A'}</td>
+        <td>${row.rol || 'N/A'}</td>
+        <td><span style="color:${estadoColor};">● ${row.estado}</span></td>
+        <td>${row.ip_usuario || 'N/A'}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+  
+  function populateAccidentsTable(data) {
+    const tbody = document.getElementById('accidents-table-body');
+    tbody.innerHTML = '';
+    
+    if (!data || data.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#999;">No hay registros</td></tr>';
+      return;
+    }
+    
+    data.forEach(row => {
+      const tr = document.createElement('tr');
+      const videoName = row.ruta_archivo ? row.ruta_archivo.split('\\').pop() : 'N/A';
+      
+      tr.innerHTML = `
+        <td>${row.id}</td>
+        <td>${new Date(row.fecha_deteccion).toLocaleString('es-CO')}</td>
+        <td>${row.camera_ip || 'Cámara ' + (row.camara_id || 'N/A')}</td>
+        <td>${row.camera_location || 'N/A'}</td>
+        <td>${row.latitud ? parseFloat(row.latitud).toFixed(6) : 'N/A'}</td>
+        <td>${row.longitud ? parseFloat(row.longitud).toFixed(6) : 'N/A'}</td>
+        <td>${videoName}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+  
+  function exportReport(type) {
+    let data = [];
+    let filename = `reporte_${type}_${new Date().toISOString().split('T')[0]}.csv`;
+    
+    if (type === 'audit') {
+      const rows = document.querySelectorAll('#audit-table-body tr');
+      data = Array.from(rows).map(tr => {
+        const cells = tr.querySelectorAll('td');
+        return Array.from(cells).map(td => `"${td.innerText}"`).join(',');
+      });
+      data.unshift('ID,Tipo Evento,Usuario,Descripción,Fecha/Hora,IP');
+    } else if (type === 'access') {
+      const rows = document.querySelectorAll('#access-table-body tr');
+      data = Array.from(rows).map(tr => {
+        const cells = tr.querySelectorAll('td');
+        return Array.from(cells).map(td => `"${td.innerText}"`).join(',');
+      });
+      data.unshift('ID,Fecha/Hora,Usuario,Correo,Rol,Estado,IP');
+    } else if (type === 'accidents') {
+      const rows = document.querySelectorAll('#accidents-table-body tr');
+      data = Array.from(rows).map(tr => {
+        const cells = tr.querySelectorAll('td');
+        return Array.from(cells).map(td => `"${td.innerText}"`).join(',');
+      });
+      data.unshift('ID,Fecha/Hora,Cámara,Ubicación,Latitud,Longitud,Video');
+    }
+    
+    const csv = data.join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    showToast(`Reporte exportado: ${filename}`, 'success');
   }
 
-  function renderReports() {
-    showToast('Cargando reportes...', 'info');
+  function generateReport() {
+    showReportTab('audit');
   }
 
   // ============================================
@@ -2096,6 +3120,7 @@ setInterval(updateSystemConfig, 10000);
   // ============================================
   // INICIALIZACIÓN
   // ============================================
+
 
 window.onload = function() {
   console.log('%c🎯 SISTEMA DE DETECCIÓN YOLO INICIADO', 'color: #4CAF50; font-size: 16px; font-weight: bold;');
