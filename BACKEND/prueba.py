@@ -1,106 +1,126 @@
-import hashlib
-from database import db
+# prueba.py
+import os
+import time
+import logging
+from datetime import datetime
+from tkinter import Tk, filedialog
+import socketio
+from services.video_service import VideoService
 
-def create_admin():
-    """Crear usuario administrador por defecto"""
-    
-    # Datos del admin
-    nombre = "Administrador"
-    correo = "admin@sistema.local"
-    password = "Admin123!"  # ⚠️ CAMBIAR DESPUÉS DEL PRIMER LOGIN
-    rol = "admin"
-    
-    # Hash de la contraseña
-    password_hash = hashlib.sha256(password.encode()).hexdigest()
-    
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("PRUEBA_VIDEO_GUI")
+
+# =====================================================
+# 🔌 CONEXIÓN SOCKET (AJUSTADO + LOGS DE DEPURACIÓN)
+# =====================================================
+sio = socketio.Client(logger=True, engineio_logger=True)
+
+SOCKET_URL = "http://127.0.0.1:5000"   # ⚠️ Usa tu backend local
+# SOCKET_URL = "https://accident-detector.site"  # Úsalo solo si ese dominio está activo
+
+def conectar_socket():
+    global sio
     try:
-        # Verificar si ya existe
-        existing = db.get_user_by_correo(correo)
-        
-        if existing:
-            print(f"❌ El usuario {correo} ya existe")
-            print(f"   ID: {existing['id']}")
-            print(f"   Nombre: {existing['nombre']}")
-            print(f"   Rol: {existing['role']}")
-            return
-        
-        # Crear usuario
-        user_id = db.create_user(
-            nombre=nombre,
-            correo=correo,
-            password_hash=password_hash,
-            role=rol
+        sio.connect(
+            SOCKET_URL,
+            transports=['websocket'],
+            namespaces=['/']
         )
-        
-        print("=" * 60)
-        print("✅ USUARIO ADMINISTRADOR CREADO EXITOSAMENTE")
-        print("=" * 60)
-        print(f"📧 Correo: {correo}")
-        print(f"🔑 Contraseña: {password}")
-        print(f"👤 Nombre: {nombre}")
-        print(f"🎖️  Rol: {rol}")
-        print(f"🆔 ID: {user_id}")
-        print("=" * 60)
-        print("⚠️  IMPORTANTE: Cambia la contraseña después del primer login")
-        print("=" * 60)
-        
+        logger.info("✅ Conectado correctamente a Socket.IO")
+        return True
     except Exception as e:
-        print(f"❌ Error creando usuario: {e}")
+        logger.error(f"❌ Error al conectar con Socket.IO: {e}")
+        return False
 
-def create_test_users():
-    """Crear usuarios de prueba para todos los roles"""
-    
-    users = [
-        {
-            'nombre': 'Operador Test',
-            'correo': 'operador@test.com',
-            'password': 'Operador123!',
-            'rol': 'operador'
-        },
-        {
-            'nombre': 'Emergencias Test',
-            'correo': 'emergencias@test.com',
-            'password': 'Emergencias123!',
-            'rol': 'emergencias'
-        }
-    ]
-    
-    print("\n📋 CREANDO USUARIOS DE PRUEBA...\n")
-    
-    for user_data in users:
+
+# =====================================================
+# 🖼️ SELECCIONAR VIDEO
+# =====================================================
+def seleccionar_video():
+    root = Tk()
+    root.withdraw()
+    archivo = filedialog.askopenfilename(
+        title="Seleccionar video",
+        filetypes=[("MP4 files", "*.mp4"), ("Todos los archivos", "*.*")]
+    )
+
+    if archivo:
+        logger.info(f"🎥 Video seleccionado: {archivo}")
+        analizar_video(archivo)
+    else:
+        logger.info("⚠️ No se seleccionó ningún video.")
+
+
+# =====================================================
+# 🤖 ANALIZAR VIDEO + ENVIAR ALERTA
+# =====================================================
+def analizar_video(video_path):
+    logger.info("\n" + "=" * 70)
+    logger.info("🎮 INICIANDO ANÁLISIS DE VIDEO")
+    logger.info("=" * 70 + "\n")
+
+    # Ejecutar detección con tu servicio
+    result = VideoService.analyze_video(video_path, os.path.basename(video_path))
+
+    total = result.get('total_detections', 0)
+    logger.info(f"📊 Total detecciones: {total}")
+
+    # Si no hubo detecciones → no se envía alerta
+    if total == 0:
+        logger.info("⚠️ Sin accidentes detectados, no se envía alerta.")
+        return
+
+    # -------------------------------------
+    # ✨ PREPARAR LA ALERTA A ENVIAR
+    # -------------------------------------
+    first_det = result['detections'][0]
+
+    accident_id = int(time.time())  # simular ID único
+    camera_id = "CAM_PRUEBA_001"
+    camera_ip = "127.0.0.1"
+
+    latitude = 4.710989
+    longitude = -74.072090
+    confidence = int(first_det['confidence'] * 100)
+
+    payload = {
+        "accident_id": accident_id,
+        "camera_id": camera_id,
+        "camera_ip": camera_ip,
+        "latitude": latitude,
+        "longitude": longitude,
+        "timestamp": datetime.now().isoformat(),
+        "image_url": f"/api/mobile/image/{accident_id}",  # coincide con tu backend
+        "message": f"🚨 Accidente detectado en cámara {camera_id}",
+        "severity": "high",
+        "confidence": confidence,
+    }
+
+    # -------------------------------------
+    # 🚨 ENVIAR ALERTA POR SOCKET.IO
+    # -------------------------------------
+    if sio.connected:
         try:
-            # Verificar si existe
-            existing = db.get_user_by_correo(user_data['correo'])
-            if existing:
-                print(f"⏭️  Usuario {user_data['correo']} ya existe")
-                continue
-            
-            # Hash de contraseña
-            password_hash = hashlib.sha256(user_data['password'].encode()).hexdigest()
-            
-            # Crear
-            user_id = db.create_user(
-                nombre=user_data['nombre'],
-                correo=user_data['correo'],
-                password_hash=password_hash,
-                role=user_data['rol']
-            )
-            
-            print(f"✅ {user_data['rol'].upper()}")
-            print(f"   📧 Correo: {user_data['correo']}")
-            print(f"   🔑 Contraseña: {user_data['password']}")
-            print(f"   🆔 ID: {user_id}\n")
-            
+            sio.emit("mobile_emergency_alert", payload)
+            logger.info("🔺 ALERTA ENVIADA EXITOSAMENTE")
+            logger.info(payload)
         except Exception as e:
-            print(f"❌ Error creando {user_data['nombre']}: {e}\n")
+            logger.error(f"❌ Error enviando alerta: {e}")
+    else:
+        logger.error("❌ No hay conexión con Socket.IO — alerta NO enviada")
 
-if __name__ == '__main__':
-    print("\n🚀 INICIALIZANDO USUARIOS DEL SISTEMA\n")
-    
-    # Crear admin
-    create_admin()
-    
-    # Crear usuarios de prueba
-    create_test_users()
-    
-    print("\n✅ PROCESO COMPLETADO\n")
+    # Exportar reporte (si aplica)
+    VideoService.generate_report(result)
+    logger.info("✅ Análisis completado.\n")
+
+
+# =====================================================
+# 🚀 EJECUCIÓN PRINCIPAL
+# =====================================================
+if __name__ == "__main__":
+    if conectar_socket():
+        seleccionar_video()
+        sio.disconnect()
+        logger.info("🔌 SocketIO desconectado")
+    else:
+        logger.error("❌ No se pudo iniciar prueba — Socket no conectado")

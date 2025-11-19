@@ -852,6 +852,17 @@ def get_camera_stats(current_user, camera_id):
 # ============================================
 # ENDPOINTS PARA APP MÓVIL - ALERTAS
 # ============================================
+@socketio.on('mobile_ping')
+def handle_mobile_ping(data):
+    logger.info(f"📱 Ping recibido desde móvil: {data}")
+    emit('mobile_pong', {'status': 'alive'}, room=request.sid)
+
+
+@socketio.on('mobile_ack')
+def handle_mobile_ack(data):
+    accident_id = data.get('accident_id')
+    logger.info(f"📱 ACK desde móvil: alerta {accident_id} recibida")
+
 
 @app.route('/api/mobile/image/<int:accident_id>', methods=['GET'])
 def get_accident_image_mobile(accident_id):
@@ -896,22 +907,38 @@ def get_accident_image_mobile(accident_id):
 
 @socketio.on('mobile_connect')
 def handle_mobile_connect(data):
-    """App móvil se conecta para recibir alertas"""
+    """App móvil se conecta para recibir alertas (modo pruebas: sin login)"""
     from flask_socketio import join_room
-    
-    user_id = data.get('user_id', 'anonymous')
-    logger.info(f"📱 App móvil conectada - Usuario: {user_id}, SID: {request.sid}")
-    
-    # Unir a room de alertas de emergencia
+
+    # Si no existe user_id o no hay login, igual lo aceptamos
+    user_id = data.get('user_id', 'sin_login')
+
+    logger.info(f"📱 App móvil conectada (MODO PRUEBAS) - Usuario: {user_id}, SID: {request.sid}")
+
+    # 🔥 Modo pruebas: TODOS los clientes entran al room de alertas
     join_room('mobile_emergency')
-    
+
     emit('mobile_connected', {
         'status': 'connected',
-        'message': 'Conectado - Recibirás alertas en tiempo real',
+        'message': 'Conectado (modo pruebas) - Recibirás alertas en tiempo real',
         'timestamp': datetime.now().isoformat()
     })
 
+@socketio.on("mobile_emergency_alert")
+def debug_alert(data):
+    from flask_socketio import emit
 
+    print("🔥 ALERTA RECIBIDA EN SERVIDOR:", data)
+
+    # 🔥 Reenviar a TODAS las apps unidas al room mobile_emergency
+    emit(
+        "mobile_emergency_alert",
+        data,
+        room="mobile_emergency"
+    )
+
+    print("📡 ALERTA reenviada al room 'mobile_emergency'")
+    
 # ============================================
 # ENDPOINTS PARA REPORTES
 # ============================================

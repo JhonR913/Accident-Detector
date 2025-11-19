@@ -2133,9 +2133,20 @@ function updateStatsSummary(accidents) {
 function createHourChart(accidents) {
   const ctx = document.getElementById('hourChart').getContext('2d');
   if (charts.hour) charts.hour.destroy();
+
   const hourData = new Array(24).fill(0);
-  accidents.forEach(acc => hourData[new Date(acc.fecha_accidente).getHours()]++);
+
+  accidents.forEach(acc => {
+    let h = new Date(acc.fecha_accidente).getHours();
+
+    // 🔥 Ajustar a hora real de Colombia
+    h = (h + 5) % 24;
+
+    hourData[h]++;
+  });
+
   const avg = hourData.reduce((a, b) => a + b, 0) / 24;
+
   charts.hour = new Chart(ctx, {
     type: 'line',
     data: {
@@ -2166,6 +2177,7 @@ function createHourChart(accidents) {
     }
   });
 }
+
 
 function createSeverityChart(accidents) {
   const ctx = document.getElementById('severityChart').getContext('2d');
