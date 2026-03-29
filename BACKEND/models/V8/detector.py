@@ -80,7 +80,7 @@ class SevereAccidentDetector:
             logger.warning(f"⚠️ Clase '{self.target_class}' NO encontrada")
             logger.warning(f"Usando primera clase: {available_classes[0] if available_classes else 'ninguna'}")
         
-        logger.info(f"✅ Modelo cargado en {self.device.upper()} - Detectando: 'moderate' y 'severe' (conf >= {self.confidence})")
+        logger.info(f"✅ Modelo cargado en {self.device.upper()} - Detectando: '{self.target_class}' (conf >= {self.confidence})")
     
     def detect_severe(self, frame):
         """Detectar accidentes SEVERE en un frame"""
@@ -94,7 +94,7 @@ class SevereAccidentDetector:
                 verbose=False
             )
             
-            tiene_accidente = False
+            tiene_severe = False
             max_confidence = 0.0
             bbox = None
             
@@ -106,8 +106,8 @@ class SevereAccidentDetector:
             ):
                 class_name = self.model.names[int(cls)]
                 
-                if class_name in ["moderate", "severe"]:
-                    tiene_accidente = True
+                if class_name == self.target_class:
+                    tiene_severe = True
                     confidence_val = float(conf)
                     
                     if confidence_val > max_confidence:
@@ -115,11 +115,11 @@ class SevereAccidentDetector:
                         bbox = box.cpu().numpy().tolist()  # Mover a CPU para guardar
             
             # Anotar frame
-            if tiene_accidente:
+            if tiene_severe:
                 annotated_frame = results[0].plot()
                 cv2.putText(
                     annotated_frame, 
-                    "ACCIDENTE DETECTADO", 
+                    "ACCIDENTE SEVERE", 
                     (50, 50), 
                     cv2.FONT_HERSHEY_SIMPLEX, 
                     1.5, 
@@ -130,7 +130,7 @@ class SevereAccidentDetector:
             else:
                 annotated_frame = frame.copy()
             
-            return tiene_accidente, max_confidence, annotated_frame, bbox
+            return tiene_severe, max_confidence, annotated_frame, bbox
             
         except Exception as e:
             logger.error(f"❌ Error en detect_severe: {e}")
@@ -196,9 +196,9 @@ class SevereAccidentDetector:
                 
                 # Procesar cada N frames (según Config.FRAME_SKIP)
                 if frame_number % Config.FRAME_SKIP == 0:
-                    tiene_accidente, confidence, _, bbox = self.detect_severe(frame)
+                    tiene_severe, confidence, _, bbox = self.detect_severe(frame)
                     
-                    if tiene_accidente:
+                    if tiene_severe:
                         ts = frame_number / fps
                         detections.append({
                             'frame': frame_number,
